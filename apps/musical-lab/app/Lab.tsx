@@ -4,26 +4,34 @@ import { useEffect, useMemo, useState } from "react";
 import {
   buildScale,
   CYCLE_IDS,
+  cyclePlanToIR,
   cycleDrift,
   findTriadVoicings,
   formatNote,
   formatPitch,
+  frac,
   guitarStringNumber,
   INVERSION_NAMES,
   isSameNote,
   LETTERS,
   makeFretboard,
   planCycleOnGuitar,
+  planPerfectCycleLoop,
   SCALE_TYPES,
+  serializeMusicIR,
   STANDARD_TUNING,
+  toSeconds,
+  validateMusicIR,
   validateVoicing,
   withDefaults,
   type DiatonicTriad,
   type GuitarNote,
   type Inversion,
+  type MusicIR,
   type Pitch,
   type ScaleType,
 } from "@musical-lab/engine";
+import { ensureAudio, playChord, type PluckTone } from "./audio";
 import Fretboard, { type DisplayNote, type Role } from "./Fretboard";
 
 const TONICS = LETTERS.flatMap((l) => [l, `${l}b`, `${l}#`]);
@@ -34,6 +42,14 @@ const SCALE_LABEL: Record<ScaleType, string> = {
 };
 
 type FoldPolicy = "sweep" | "whole-voicing" | "none";
+
+/** Facts about a perfect loop, shown to the user. */
+interface LoopInfo {
+  laps: number;
+  length: number;
+  wraps: number;
+  restartJump: number;
+}
 
 /** One chord ready to show: abstract theory + the guitar realization of it. */
 interface Frame {
@@ -77,14 +93,17 @@ export default function Lab() {
   const [showScale, setShowScale] = useState(true);
   const [loop, setLoop] = useState(true);
   const [playing, setPlaying] = useState(false);
+  const [sound, setSound] = useState(true);
+  const [tone, setTone] = useState<PluckTone>("mellow");
+  const [bpm, setBpm] = useState(72);
+  const [heard, setHeard] = useState("");
   const [step, setStep] = useState(0);
 
   const board = useMemo(() => makeFretboard(STANDARD_TUNING, 22), []);
   const scale = useMemo(() => buildScale(tonic, scaleType), [tonic, scaleType]);
   const constraints = useMemo(() => withDefaults({ maxFretSpan, maxFret }), [maxFretSpan, maxFret]);
-  // In sweep mode the cycle just keeps going (and wraps when out of room), so the
-  // "last chord returns to the first" loop does not apply.
-  const looping = loop && fold !== "sweep";
+  // Sweep is a perfect loop by construction: the last chord always hands back to the first.
+  const looping = fold === "sweep" || loop;
 
   const result = useMemo(() => {
     if (mode === "voicings") {
@@ -104,19 +123,43 @@ export default function Lab() {
         theory: [] as DiatonicTriad[],
         cost: null as number | null,
         closing: null as number | null,
+        info: null as LoopInfo | null,
+        ir: null as MusicIR | null,
       };
     }
-    const plan = planCycleOnGuitar(scale, cycle, board, {
-      startDegree: degree,
-      inversion,
-      length,
-      octaveShift: fold,
-      anchorFret: anchor === "" ? undefined : anchor,
-      loop: looping,
-      constraints: { maxFretSpan, maxFret },
-    });
+    const anchorFret = anchor === "" ? undefined : anchor;
+    const loopPlan =
+      fold === "sweep"
+        ? planPerfectCycleLoop(scale, cycle, board, {
+            startDegree: degree,
+            inversion,
+            anchorFret,
+            constraints: { maxFretSpan, maxFret },
+          })
+        : null;
+    const plan =
+      loopPlan ??
+      planCycleOnGuitar(scale, cycle, board, {
+        startDegree: degree,
+        inversion,
+        length,
+        octaveShift: fold,
+        anchorFret,
+        loop,
+        constraints: { maxFretSpan, maxFret },
+      });
+    const info: LoopInfo | null = loopPlan
+      ? {
+          laps: loopPlan.laps,
+          length: loopPlan.length,
+          wraps: loopPlan.wraps,
+          restartJump: loopPlan.restartJumpOctaves,
+        }
+      : null;
     const theory = plan.cycle.map((s) => s.triad);
-    if (!plan.path.ok) return { frames: [] as Frame[], error: plan.path.reason, theory, cost: null, closing: null };
+    if (!plan.path.ok) {
+      return { frames: [] as Frame[], error: plan.path.reason, theory, cost: null, closing: null, info, ir: null };
+    }
     const frames: Frame[] = plan.path.steps.map((s) => ({
       title: `Step ${s.index + 1}`,
       triad: s.voicing.triad,
@@ -129,8 +172,12 @@ export default function Lab() {
       wrapped: s.wrapped,
       cost: s.costFromPrevious,
     }));
-    return { frames, error: null, theory, cost: plan.path.totalCost, closing: plan.path.closingCost ?? null };
-  }, [mode, scale, cycle, degree, inversion, length, fold, anchor, looping, maxFretSpan, maxFret, board, constraints]);
+    // the same plan as a MusicIR document (exact times, voice leading, constraints, provenance)
+    const ir = cyclePlanToIR(scale, cycle, plan, { constraints, tuning: STANDARD_TUNING, tempo: { bpm } });
+    return { frames, error: null, theory, cost: plan.path.totalCost, closing: plan.path.closingCost ?? null, info, ir };
+  }, [mode, scale, cycle, degree, inversion, length, fold, anchor, loop, maxFretSpan, maxFret, board, constraints, bpm]);
+
+  const irIssues = useMemo(() => (result.ir ? validateMusicIR(result.ir) : []), [result.ir]);
 
   const frames = result.frames;
   const idx = Math.min(step, Math.max(0, frames.length - 1));
@@ -141,27 +188,46 @@ export default function Lab() {
   // the chord we just came from: the previous step, or the last one when wrapping
   const prev = mode === "cycle" ? (idx > 0 ? frames[idx - 1] : wraps ? frames[frames.length - 1] : undefined) : undefined;
 
+  /** Strum a chord (the notes' MIDI numbers, bass first) if sound is on. */
+  const hear = (f: Frame | undefined) => {
+    if (!sound || !f) return;
+    if (playChord(f.guitar.map((n) => n.midi), tone)) setHeard(f.pitches.map(formatPitch).join("  "));
+  };
+
+  /** Jump to a chord and let it sound. */
+  const go = (i: number) => {
+    setStep(i);
+    hear(frames[i]);
+  };
+
   /** Step forward/back; in a loop the last chord continues to the first and vice versa. */
-  const move = (dir: 1 | -1) =>
-    setStep((s) => {
-      const n = frames.length;
-      const next = s + dir;
-      if (next >= 0 && next < n) return next;
-      return wraps ? (next + n) % n : s;
-    });
+  const move = (dir: 1 | -1) => {
+    const n = frames.length;
+    if (n === 0) return;
+    const next = idx + dir;
+    const target = next >= 0 && next < n ? next : wraps ? (next + n) % n : idx;
+    if (target !== idx) go(target);
+  };
 
   useEffect(() => setStep(0), [mode, tonic, scaleType, cycle, degree, inversion, length]);
 
-  // Auto-play: advance every ~1.1s; wraps when looping, otherwise stops on the last chord.
+  // One chord = one beat. Its length in real time comes from the temporal engine, not a constant.
+  const chordSeconds = toSeconds(frac(1, 4), bpm);
+
+  // Auto-play: sound each chord as it comes up, then advance after one beat. Wraps when looping,
+  // otherwise stops on the last chord.
   useEffect(() => {
     if (!playing || mode !== "cycle" || frames.length < 2) return;
+    hear(frames[idx]);
     const t = setTimeout(() => {
       if (idx + 1 < frames.length) setStep(idx + 1);
       else if (wraps) setStep(0);
       else setPlaying(false);
-    }, 1100);
+    }, chordSeconds * 1000);
     return () => clearTimeout(t);
-  }, [playing, mode, idx, frames.length, wraps]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, mode, idx, frames, wraps, chordSeconds]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
@@ -172,7 +238,19 @@ export default function Lab() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frames.length, wraps]);
+  }, [frames, idx, wraps, sound]);
+
+  /** Download the current plan as a MusicIR JSON document. */
+  const exportIR = () => {
+    if (!result.ir) return;
+    const blob = new Blob([serializeMusicIR(result.ir)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `musicir-${tonic}-${scaleType}-cycle${cycle}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const violations = frame ? validateVoicing(frame.guitar, board, constraints, frame.pitches) : [];
   const tab = frame
@@ -234,12 +312,14 @@ export default function Lab() {
         </label>
         {mode === "cycle" && (
           <>
-            <label>Chords
-              <input type="number" min={1} max={90} value={length} onChange={(e) => setLength(clamp(Number(e.target.value), 1, 90))} />
-            </label>
+            {fold !== "sweep" && (
+              <label>Chords
+                <input type="number" min={1} max={90} value={length} onChange={(e) => setLength(clamp(Number(e.target.value), 1, 90))} />
+              </label>
+            )}
             <label>Across the neck
               <select value={fold} onChange={(e) => setFold(e.target.value as FoldPolicy)}>
-                <option value="sweep">Run the neck, wrap when out of room</option>
+                <option value="sweep">Perfect loop (runs the neck, restarts)</option>
                 <option value="whole-voicing">Fold each chord to fit (smoothest)</option>
                 <option value="none">Exact pitches, no wrap (may fail)</option>
               </select>
@@ -264,6 +344,28 @@ export default function Lab() {
         <label className="check">
           <input type="checkbox" checked={showScale} onChange={(e) => setShowScale(e.target.checked)} /> Show scale notes
         </label>
+        <label className="check">
+          <input type="checkbox" checked={sound} onChange={(e) => setSound(e.target.checked)} /> Sound
+        </label>
+        <label>Tone
+          <select
+            value={tone}
+            onChange={(e) => {
+              setTone(e.target.value as PluckTone);
+              // let the new tone be heard right away, with the chord on screen
+              if (sound && frame) playChord(frame.guitar.map((n) => n.midi), e.target.value as PluckTone);
+            }}
+          >
+            <option value="soft">Soft (round, short)</option>
+            <option value="mellow">Mellow (default)</option>
+            <option value="bright">Bright (the original)</option>
+          </select>
+        </label>
+        {mode === "cycle" && (
+          <label>Tempo (BPM, 1 chord = 1 beat)
+            <input type="number" min={20} max={240} value={bpm} onChange={(e) => setBpm(clamp(Number(e.target.value), 20, 240))} />
+          </label>
+        )}
       </section>
 
       <section className="panel scale-line">
@@ -282,7 +384,7 @@ export default function Lab() {
                 key={i}
                 className={["chip", i === idx && f ? "active" : "", f?.wrapped ? "wrapped" : ""].join(" ").trim()}
                 disabled={!f}
-                onClick={() => setStep(i)}
+                onClick={() => go(i)}
                 title={f?.wrapped ? `wrapped to the ${descending ? "top" : "bottom"} of the neck here` : `chord ${i + 1}`}
               >
                 <b>{t.roman}</b>
@@ -295,17 +397,25 @@ export default function Lab() {
         </nav>
       )}
 
-      {mode === "cycle" && frames.length > 0 && fold === "sweep" && (
+      {mode === "cycle" && frames.length > 0 && fold === "sweep" && result.info && (
         <p className="hint">
-          Cycle {cycle} {descending ? "descends" : "ascends"}: it runs {descending ? "down toward the lowest strings" : "up toward the highest strings and frets"},
-          and when a chord has no room left it wraps to the {descending ? "top (high frets and strings)" : "bottom (low strings)"} and keeps going.
-          {" "}{wrapCount === 0 ? "No wrap in these chords. Raise “Chords” to see one." : `${wrapCount} wrap${wrapCount > 1 ? "s" : ""} in ${frames.length} chords (⟲).`}
+          <b>Perfect loop · {result.info.length} chords, {result.info.wraps} wrap{result.info.wraps === 1 ? "" : "s"} (⟲)</b>
+          {" "}Cycle {cycle} {descending ? "descends" : "ascends"}: it runs {descending ? "down from the high strings and frets toward the lowest strings" : "up from the low strings toward the highest strings and frets"},
+          changing string sets as it goes. When the next triad has no room left it wraps back to the {descending ? "top" : "bottom"} and
+          carries on with the next triad of the cycle. After chord {result.info.length} the next triad is the first one again, in the same place,
+          so the loop closes and repeats forever.
         </p>
       )}
 
       {mode === "cycle" && frames.length > 1 && (
         <div className="nav">
-          <button onClick={() => setPlaying((p) => !p)} aria-label={playing ? "Pause" : "Play"}>
+          <button
+            onClick={() => {
+              if (!playing && sound) ensureAudio(); // browsers only allow sound after a click
+              setPlaying((p) => !p);
+            }}
+            aria-label={playing ? "Pause" : "Play"}
+          >
             {playing ? "⏸ Pause" : "▶ Play"}
           </button>
           <button onClick={() => move(-1)} disabled={!wraps && idx === 0} aria-label="Previous chord">← Prev</button>
@@ -317,6 +427,7 @@ export default function Lab() {
           >
             Next →
           </button>
+          <button onClick={() => hear(frame)} disabled={!sound} aria-label="Hear this chord again">🔊 Hear</button>
           <span>
             Chord {idx + 1} of {frames.length}
             {frame?.wrapped && <span className="badge">⟲ wrapped to the {descending ? "top" : "bottom"} of the neck</span>}
@@ -328,9 +439,9 @@ export default function Lab() {
 
       {mode === "voicings" && frames.length > 0 && (
         <div className="panel slider">
-          <button onClick={() => setStep(Math.max(0, idx - 1))}>←</button>
-          <input type="range" min={0} max={frames.length - 1} value={idx} onChange={(e) => setStep(Number(e.target.value))} />
-          <button onClick={() => setStep(Math.min(frames.length - 1, idx + 1))}>→</button>
+          <button onClick={() => go(Math.max(0, idx - 1))}>←</button>
+          <input type="range" min={0} max={frames.length - 1} value={idx} onChange={(e) => go(Number(e.target.value))} />
+          <button onClick={() => go(Math.min(frames.length - 1, idx + 1))}>→</button>
           <span>{idx + 1} / {frames.length}</span>
         </div>
       )}
@@ -386,12 +497,29 @@ export default function Lab() {
             <div>
               <h2>Engine verdict</h2>
               {violations.length === 0 ? (
-                <p className="ok">✓ physically valid, exact pitches, within limits</p>
+                <p className="ok">✓ valid under the configured constraints, with exact pitches</p>
               ) : (
                 <ul className="bad">{violations.map((v, i) => <li key={i}><b>{v.code}</b> {v.message}</li>)}</ul>
               )}
+              <p className="muted">
+                An approximation: it checks string order, fret stretch, exact pitches and an estimated finger count.
+                It does not guarantee a shape is comfortable to play.
+              </p>
               {mode === "cycle" && result.cost !== null && (
                 <p className="muted">Whole {wraps ? "loop" : "path"} cost: {result.cost.toFixed(1)}</p>
+              )}
+              {sound && heard && <p className="muted" data-testid="heard">🔊 last heard: {heard}</p>}
+              {result.ir && (
+                <>
+                  {irIssues.length === 0 ? (
+                    <p className="ok" data-testid="ir-status">
+                      ✓ MusicIR valid · {result.ir.chords.length} chords, {result.ir.events.length} notes
+                    </p>
+                  ) : (
+                    <p className="bad" data-testid="ir-status">✗ MusicIR has {irIssues.length} problem(s): {irIssues[0]!.message}</p>
+                  )}
+                  <button className="export" onClick={exportIR}>⬇ Export MusicIR (JSON)</button>
+                </>
               )}
             </div>
           </section>
@@ -404,7 +532,7 @@ export default function Lab() {
                   <thead><tr><th>#</th><th>Chord</th><th>Inv.</th><th>Sounding</th><th>Tab 6→1</th><th>Shift</th><th>Cost</th></tr></thead>
                   <tbody>
                     {frames.map((f, i) => (
-                      <tr key={i} className={i === idx ? "sel" : ""} onClick={() => setStep(i)}>
+                      <tr key={i} className={i === idx ? "sel" : ""} onClick={() => go(i)}>
                         <td>{i + 1}</td>
                         <td>{f.triad.roman} {f.triad.symbol}</td>
                         <td>{f.inversion}</td>
@@ -415,9 +543,11 @@ export default function Lab() {
                       </tr>
                     ))}
                     {wraps && result.closing !== null && (
-                      <tr className="wrap-row" onClick={() => setStep(0)}>
+                      <tr className="wrap-row" onClick={() => go(0)}>
                         <td>↻</td>
-                        <td colSpan={5}>then back to chord 1 (string-set change / octave fold happens here if needed)</td>
+                        <td colSpan={5}>
+                          then back to chord 1{fold === "sweep" ? " (the next triad of the cycle is the first one again, in the same place: loop repeats)" : " (string-set change / octave fold happens here if needed)"}
+                        </td>
                         <td>{result.closing.toFixed(1)}</td>
                       </tr>
                     )}

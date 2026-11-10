@@ -36,12 +36,12 @@ const KEYS: [string, "major" | "naturalMinor" | "harmonicMinor"][] = [
 ];
 const INVERSIONS: Inversion[] = [0, 1, 2];
 
-describe("perfect loop: a whole number of 21-chord laps", () => {
+describe("perfect loop: the cycle continues, wraps when out of room, and closes on the first triad", () => {
   it("one lap of true voice leading is 21 chords", () => {
     expect(CYCLE_LAP).toBe(21);
   });
 
-  it.each(CYCLE_IDS)("cycle %i: every chord playable, exact and correctly spelled (keys × inversions × start degrees)", (id) => {
+  it.each(CYCLE_IDS)("cycle %i closes for every key × inversion × start degree, with every chord playable, exact and spelled right", (id) => {
     for (const [tonic, type] of KEYS) {
       for (const inversion of INVERSIONS) {
         for (const startDegree of [1, 4]) {
@@ -49,6 +49,7 @@ describe("perfect loop: a whole number of 21-chord laps", () => {
           const ctx = `${tonic} ${type} c${id} inv${inversion} d${startDegree}`;
           expect(path.steps.length % CYCLE_LAP, ctx).toBe(0);
           expect(plan.length, ctx).toBe(path.steps.length);
+          expect(plan.laps, ctx).toBe(plan.length / CYCLE_LAP);
           path.steps.forEach((s, i) => {
             const theory = plan.cycle[i]!;
             expect(s.voicing.triad.symbol, ctx).toBe(theory.triad.symbol);
@@ -63,7 +64,7 @@ describe("perfect loop: a whole number of 21-chord laps", () => {
     }
   });
 
-  it("closes perfectly: the chord after the last IS the first (same triad, inversion, spelling), only whole octaves apart", () => {
+  it("the triad after the last chord IS the first one: same triad, inversion and spelling, in the same place", () => {
     for (const id of CYCLE_IDS) {
       for (const [tonic, type] of KEYS) {
         for (const inversion of INVERSIONS) {
@@ -75,19 +76,101 @@ describe("perfect loop: a whole number of 21-chord laps", () => {
           const last = path.steps[path.steps.length - 1]!;
           expect(next.triad.symbol, ctx).toBe(first.voicing.triad.symbol);
           expect(next.inversion, ctx).toBe(first.voicing.inversion);
-          // every voice: same note name, and the gap is the same whole number of octaves
           const gaps = first.voicing.pitches.map((p, v) => {
             const n = next.voicing.pitches[v]!;
             expect(formatNote(p), ctx).toBe(formatNote(n));
             expect(pitchClass(p), ctx).toBe(pitchClass(n));
             return midi(p) - (midi(n) + 12 * last.octaveShift);
           });
-          expect(new Set(gaps).size, ctx).toBe(1);
-          expect(gaps[0]! % 12, ctx).toBe(0);
+          expect(new Set(gaps).size, ctx).toBe(1); // all voices move together
+          expect(Math.abs(gaps[0]!) % 12, ctx).toBe(0); // by whole octaves only
           expect(gaps[0]! / 12, ctx).toBe(plan.restartJumpOctaves);
         }
       }
     }
+  });
+
+  it("the restart is either plain continuation, or a wrap that was forced because the next chord had no room", () => {
+    let continuation = 0;
+    let wrapLanding = 0;
+    for (const id of CYCLE_IDS) {
+      for (const [tonic, type] of KEYS) {
+        for (const inversion of INVERSIONS) {
+          const { plan, path } = loopOf(id, tonic, type, { inversion });
+          const ctx = `${tonic} ${type} c${id} inv${inversion}`;
+          const last = path.steps[path.steps.length - 1]!;
+          const nextTheory = generateCycle(buildScale(tonic, type), id, { inversion, length: plan.length + 1 })[plan.length]!;
+          const playableWhereItIs =
+            realizeVoicing(shiftVoicingOctaves(nextTheory.voicing, last.octaveShift), fb, C).length > 0;
+          if (plan.restartJumpOctaves === 0) {
+            // the true next chord, at the octave the run is in, IS the first chord: nothing to jump
+            continuation++;
+            expect(playableWhereItIs, ctx).toBe(true);
+          } else {
+            // the run had to wrap, and the wrap lands exactly on the first triad
+            wrapLanding++;
+            expect(playableWhereItIs, `${ctx}: wrapped although there was room`).toBe(false);
+          }
+        }
+      }
+    }
+    // both kinds of closure occur, and between them they cover every case
+    expect(continuation).toBeGreaterThan(0);
+    expect(wrapLanding).toBeGreaterThan(0);
+    expect(continuation + wrapLanding).toBe(CYCLE_IDS.length * KEYS.length * INVERSIONS.length);
+  });
+
+  it("between wraps the real voice leading is untouched: each voice moves exactly as the cycle says", () => {
+    for (const id of CYCLE_IDS) {
+      const { plan, path } = loopOf(id);
+      for (let i = 1; i < path.steps.length; i++) {
+        if (path.steps[i]!.wrapped) continue;
+        const played = path.steps[i]!.voicing.pitches.map(midi);
+        const before = path.steps[i - 1]!.voicing.pitches.map(midi);
+        const theory = plan.cycle[i]!.voicing.pitches.map(midi);
+        const theoryBefore = plan.cycle[i - 1]!.voicing.pitches.map(midi);
+        expect(played.map((m, v) => m - before[v]!), `cycle ${id} step ${i}`).toEqual(
+          theory.map((m, v) => m - theoryBefore[v]!),
+        );
+      }
+    }
+  });
+
+  it("every cycle wraps at least once per loop, and only ever when the chord has no room", () => {
+    for (const id of CYCLE_IDS) {
+      for (const inversion of INVERSIONS) {
+        const { plan, path } = loopOf(id, "C", "major", { inversion });
+        expect(plan.wraps, `cycle ${id} inv${inversion}`).toBeGreaterThan(0);
+        const down = cycleDrift(id) < 0;
+        for (const w of path.steps.filter((s) => s.wrapped)) {
+          const prevShift = path.steps[w.index - 1]!.octaveShift;
+          const here = plan.cycle[w.index]!.voicing;
+          // (1) the chord could not be played where the run had reached
+          expect(
+            realizeVoicing(shiftVoicingOctaves(here, prevShift), fb, C).length,
+            `cycle ${id} inv${inversion} step ${w.index}: had room`,
+          ).toBe(0);
+          // (2) it went back to the far end: up for descending cycles, down for ascending ones
+          expect(down ? w.octaveShift > prevShift : w.octaveShift < prevShift).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("starts at the far end of the neck (at most one octave from the very top/bottom)", () => {
+    for (const id of CYCLE_IDS) {
+      for (const [tonic, type] of KEYS) {
+        for (const inversion of INVERSIONS) {
+          const { plan } = loopOf(id, tonic, type, { inversion });
+          expect(plan.startOctavesFromEdge, `${tonic} ${type} c${id} inv${inversion}`).toBeLessThanOrEqual(1);
+        }
+      }
+    }
+  });
+
+  it("known loop shapes for C major, root position (regression)", () => {
+    const shape = Object.fromEntries(CYCLE_IDS.map((id) => [id, loopOf(id).plan.length]));
+    expect(shape).toEqual({ 2: 21, 3: 42, 4: 21, 5: 21, 6: 42, 7: 21 });
   });
 
   it("the closing move costs what the planner says, and the totals add up", () => {
@@ -101,59 +184,7 @@ describe("perfect loop: a whole number of 21-chord laps", () => {
     }
   });
 
-  it("starts at the far end of the neck and ends at the other (top→bottom when descending, bottom→top when ascending)", () => {
-    for (const id of CYCLE_IDS) {
-      const { plan, path } = loopOf(id);
-      if (plan.laps === 0) continue; // a lap that wraps inside itself has no single end-to-end run
-      const mean = (i: number) => path.steps[i]!.voicing.pitches.reduce((s, p) => s + midi(p), 0) / 3;
-      const lastIdx = path.steps.length - 1;
-      if (cycleDrift(id) < 0) expect(mean(0), `cycle ${id}`).toBeGreaterThan(mean(lastIdx));
-      else expect(mean(0), `cycle ${id}`).toBeLessThan(mean(lastIdx));
-    }
-  });
-
-  it("uses as many whole laps as fit: a lap fewer would waste neck, a lap more would need a wrap", () => {
-    for (const id of CYCLE_IDS) {
-      for (const inversion of INVERSIONS) {
-        const { plan, path } = loopOf(id, "C", "major", { inversion });
-        if (plan.laps === 0) continue;
-        const s0 = path.steps[0]!.octaveShift;
-        // no wrap anywhere inside the loop
-        expect(path.steps.every((s) => s.octaveShift === s0), `cycle ${id} inv${inversion}`).toBe(true);
-        // adding one more lap would not fit at this octave: some chord in it has no room
-        const longer = generateCycle(buildScale("C", "major"), id, { inversion, length: plan.length + CYCLE_LAP });
-        const someStuck = longer
-          .slice(plan.length)
-          .some((s) => realizeVoicing(shiftVoicingOctaves(s.voicing, s0), fb, C).length === 0);
-        expect(someStuck, `cycle ${id} inv${inversion}: another lap would have fit`).toBe(true);
-      }
-    }
-  });
-
-  it("known lap counts for C major, root position (regression)", () => {
-    const laps = Object.fromEntries(CYCLE_IDS.map((id) => [id, loopOf(id).plan.laps]));
-    expect(laps).toEqual({ 2: 0, 3: 2, 4: 1, 5: 1, 6: 2, 7: 0 });
-    expect(loopOf(3).plan.length).toBe(42);
-    expect(loopOf(5).plan.length).toBe(21);
-  });
-
-  it("cycles too wide for one lap wrap inside it, only when out of room, and still restart exactly", () => {
-    for (const id of [2, 7]) {
-      const { plan, path } = loopOf(id);
-      expect(plan.laps).toBe(0);
-      expect(plan.length).toBe(CYCLE_LAP);
-      expect(plan.innerWraps).toBeGreaterThan(0);
-      const down = cycleDrift(id) < 0;
-      for (const w of path.steps.filter((s) => s.wrapped)) {
-        const prevShift = path.steps[w.index - 1]!.octaveShift;
-        const here = plan.cycle[w.index]!.voicing;
-        expect(realizeVoicing(shiftVoicingOctaves(here, prevShift), fb, C).length, `cycle ${id} step ${w.index}`).toBe(0);
-        expect(down ? w.octaveShift > prevShift : w.octaveShift < prevShift).toBe(true);
-      }
-    }
-  });
-
-  it("anchorFret moves the opening chord toward the requested fret, and the loop still closes", () => {
+  it("anchorFret moves the first chord toward the requested fret, and the loop still closes", () => {
     const free = loopOf(5).path;
     const anchored = loopOf(5, "C", "major", { anchorFret: 5 });
     expect(Math.abs(anchored.path.steps[0]!.guitar.center - 5)).toBeLessThanOrEqual(

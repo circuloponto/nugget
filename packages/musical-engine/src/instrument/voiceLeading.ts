@@ -5,6 +5,7 @@
  * sequence with dynamic programming (Viterbi), instead of a greedy
  * step-by-step search that can dead-end.
  */
+import { MusicTheoryError } from "../errors";
 import { formatPitch, midi } from "../theory/pitch";
 import { cycleDrift, generateCycle, type CycleStep, type GenerateCycleOptions } from "../theory/cycles";
 import { type Scale } from "../theory/scale";
@@ -64,6 +65,12 @@ export interface PlanOptions {
    * Inferred from the sequence (first vs last chord) when omitted.
    */
   sweepDirection?: "down" | "up";
+  /**
+   * Force the octave shift of every step (relative to its theoretical pitch),
+   * overriding `octaveShift`. Used when the run has already been decided and only
+   * the fingerings remain to be chosen.
+   */
+  octaveShifts?: readonly number[];
   /**
    * Optional cap on the whole-octave shift considered per step. By default
    * every shift that fits inside the instrument's pitch range is considered,
@@ -157,7 +164,11 @@ export function planGuitarPath(
   for (let i = 0; i < sequence.length; i++) {
     const layer: Candidate[] = [];
     let shifts: number[];
-    if (octaveShift === "sweep") {
+    if (options.octaveShifts) {
+      const forced = options.octaveShifts[i];
+      if (forced === undefined) throw new MusicTheoryError(`octaveShifts has no entry for step ${i}`);
+      shifts = [forced];
+    } else if (octaveShift === "sweep") {
       const base = sequence[i]!;
       let pick: number | undefined;
       if (sweepShift !== null && realized(base, sweepShift).length > 0) pick = sweepShift;
@@ -322,16 +333,18 @@ export const CYCLE_LAP = 21;
 export interface PerfectLoopPlan extends CyclePlan {
   /** Chords in one lap of the cycle's true voice leading (always 21). */
   readonly lapLength: number;
-  /** Whole laps played before the loop restarts (0 means the lap needed a wrap inside it). */
+  /** Laps in the loop (length / 21). */
   readonly laps: number;
-  /** Total chords in the loop (a multiple of 21). */
+  /** Total chords in the loop; after the last one the first triad comes next, in the same place. */
   readonly length: number;
-  /** Wraps to the far end of the neck inside the loop (not counting the restart). */
-  readonly innerWraps: number;
+  /** Times the run wrapped to the far end of the neck inside the loop. */
+  readonly wraps: number;
+  /** How many octaves below the very top (or above the very bottom) the first chord sits; 0 = at the edge. */
+  readonly startOctavesFromEdge: number;
   /**
-   * Octaves the voicing jumps when the loop restarts: the true next chord would
-   * be the first chord moved by this many octaves; it is played at the first
-   * chord's position instead. Pitch classes and voice leading are unchanged.
+   * Octaves the voicing jumps when the loop restarts. 0 means the restart is a
+   * pure continuation (the true next chord is already the first chord, in place);
+   * otherwise the last wrap lands exactly on the first chord.
    */
   readonly restartJumpOctaves: number;
 }
@@ -339,16 +352,20 @@ export interface PerfectLoopPlan extends CyclePlan {
 export type PerfectLoopOptions = Omit<PlayCycleOptions, "length" | "loop" | "octaveShift">;
 
 /**
- * A cycle that loops forever and repeats exactly.
+ * A cycle that runs the whole neck, wraps as often as it must, and closes on itself.
  *
- * The cycle's voicing only repeats after {@link CYCLE_LAP} chords, and by then it has
- * drifted a whole number of octaves. So the loop is a whole number of laps: the run
- * starts at the far end of the neck (top for descending cycles, bottom for ascending
- * ones), travels along the neck at the cycle's real pitches, and when it runs out of
- * room the first chord plays again at its original position, an octave jump that
- * leaves the harmony and voice leading untouched. The lap count is the largest that
- * fits without wrapping mid-run; when even one lap does not fit, the lap wraps
- * inside itself (reported in `innerWraps`) and still restarts exactly.
+ * The cycle is played at its real pitches (true voice leading, true next triad). It
+ * runs from one end of the neck toward the other, changing string sets on the way.
+ * When the next triad has no playable position left, the whole voicing wraps to the
+ * far end (top for descending cycles, bottom for ascending) and the run continues.
+ * It stops when the triad that follows the last one is the first triad again, in the
+ * very place it started, so playing on simply repeats the loop.
+ *
+ * Wraps only ever happen when there is no room. To make the first triad come back
+ * exactly, the search chooses the start position (among the highest placements of the
+ * first chord) and, if it must, which high octave a wrap lands in. Among the loops
+ * that close, it prefers the highest start, then the highest landings, then the
+ * shortest. Every cycle/inversion/start degree/key tried closes, in 21 or 42 chords.
  */
 export function planPerfectCycleLoop(
   scale: Scale,
@@ -357,54 +374,187 @@ export function planPerfectCycleLoop(
   options: PerfectLoopOptions = {},
 ): PerfectLoopPlan {
   const { constraints, weights, anchorFret, maxOctaveShift, sweepDirection, ...cycleOptions } = options;
-  const direction = sweepDirection ?? (cycleDrift(cycleId) < 0 ? "down" : "up");
-  const MAX_LAPS = 8;
-  const probe = generateCycle(scale, cycleId, { ...cycleOptions, length: CYCLE_LAP * MAX_LAPS + 1 });
-  const base = { constraints, weights, anchorFret, maxOctaveShift, sweepDirection: direction };
+  const down = (sweepDirection ?? (cycleDrift(cycleId) < 0 ? "down" : "up")) === "down";
 
-  const fail = (path: PlanResult): PerfectLoopPlan => ({
-    cycle: probe.slice(0, CYCLE_LAP),
-    path,
+  // One lap of true voice leading (class c = chord index mod 21) and its drift per lap in octaves.
+  const gen = generateCycle(scale, cycleId, { ...cycleOptions, length: CYCLE_LAP + 1 });
+  const T = gen.slice(0, CYCLE_LAP).map((s) => s.voicing);
+  const D = Math.round((midi(gen[CYCLE_LAP]!.voicing.pitches[0]!) - midi(gen[0]!.voicing.pitches[0]!)) / 12) || 0;
+
+  const failure = (failedStep: number, reason: string): PerfectLoopPlan => ({
+    cycle: gen.slice(0, CYCLE_LAP),
+    path: { ok: false, failedStep, reason },
     lapLength: CYCLE_LAP,
     laps: 0,
     length: 0,
-    innerWraps: 0,
+    wraps: 0,
+    startOctavesFromEdge: 0,
     restartJumpOctaves: 0,
   });
 
-  // 1. Run forward from the start and see how far the neck lasts before the first wrap.
-  const forward = planGuitarPath(
-    probe.slice(0, CYCLE_LAP * MAX_LAPS).map((s) => s.voicing),
-    fb,
-    { ...base, octaveShift: "sweep" },
-  );
-  if (!forward.ok) return fail(forward);
-  const firstWrap = forward.steps.findIndex((s) => s.wrapped);
-  const playableRun = firstWrap < 0 ? forward.steps.length : firstWrap;
-  const laps = Math.max(1, Math.floor(playableRun / CYCLE_LAP));
-  const length = laps * CYCLE_LAP;
+  // realizations(class, octave): ways to play that chord moved by `octave` octaves from its lap-1 pitch.
+  const memo = new Map<number, GuitarVoicing[]>();
+  const realizations = (c: number, o: number): GuitarVoicing[] => {
+    const k = c * 1000 + o + 500;
+    let r = memo.get(k);
+    if (!r) {
+      r = realizeVoicing(o === 0 ? T[c]! : shiftVoicingOctaves(T[c]!, o), fb, constraints);
+      memo.set(k, r);
+    }
+    return r;
+  };
+  const ok = (c: number, o: number) => realizations(c, o).length > 0;
+  const range = pitchRange(fb);
+  const feasible: number[][] = T.map((v, c) => {
+    const ms = v.pitches.map(midi);
+    const lo = Math.ceil((range.lowest - Math.min(...ms)) / 12) - 1;
+    const hi = Math.floor((range.highest - Math.max(...ms)) / 12) + 1;
+    const out: number[] = [];
+    for (let o = lo; o <= hi; o++) if (Math.abs(o) <= (maxOctaveShift ?? Infinity) + 8 && ok(c, o)) out.push(o);
+    return out;
+  });
+  const dead = feasible.findIndex((f) => f.length === 0);
+  if (dead >= 0) {
+    return failure(
+      dead,
+      `No playable realization for chord ${dead} of the lap (${T[dead]!.triad.symbol}: ${T[dead]!.pitches.map(formatPitch).join(" ")}) under the given constraints`,
+    );
+  }
+  const edge = feasible.map((f) => (down ? Math.max(...f) : Math.min(...f)));
+  const meanAt = (c: number, o: number) => meanMidi(o === 0 ? T[c]! : shiftVoicingOctaves(T[c]!, o));
 
-  // 2. Plan exactly that many chords as a closed circuit.
-  const cycle = probe.slice(0, length);
+  // Candidate starting placements of the first chord, best first.
+  const bestCenterDist = (o: number) =>
+    anchorFret === undefined ? 0 : Math.min(...realizations(0, o).map((g) => Math.abs(g.center - anchorFret)));
+  const starts = [...feasible[0]!].sort(
+    (a, b) =>
+      bestCenterDist(a) - bestCenterDist(b) || Math.abs(edge[0]! - a) - Math.abs(edge[0]! - b) || (down ? b - a : a - b),
+  );
+
+  interface Walk {
+    /** Octave chosen at each wrap, in order. */
+    landings: number[];
+    dev: number;
+    length: number;
+  }
+
+  /** Cheapest closed walk from the start state, or null. Dijkstra over landing states. */
+  const closeFrom = (o0: number): Walk | null => {
+    const keyOf = (c: number, o: number) => `${c},${o}`;
+    interface Entry {
+      c: number;
+      o: number;
+      dev: number;
+      idx: number;
+      landings: number[];
+    }
+    const best = new Map<string, { dev: number; idx: number }>();
+    const queue: Entry[] = [{ c: 0, o: o0, dev: 0, idx: 0, landings: [] }];
+    best.set(keyOf(0, o0), { dev: 0, idx: 0 });
+    let found: Walk | null = null;
+    const better = (dev: number, len: number, w: Walk | null) => !w || dev < w.dev || (dev === w.dev && len < w.length);
+
+    while (queue.length) {
+      queue.sort((a, b) => a.dev - b.dev || a.idx - b.idx);
+      const cur = queue.shift()!;
+      if (found && (cur.dev > found.dev || (cur.dev === found.dev && cur.idx >= found.length))) break;
+      const seen = best.get(keyOf(cur.c, cur.o))!;
+      if (cur.dev > seen.dev || (cur.dev === seen.dev && cur.idx > seen.idx)) continue;
+
+      // Follow the cycle forward at fixed octave until it runs out of room (or returns to the start).
+      let c = cur.c;
+      let o = cur.o;
+      let idx = cur.idx;
+      for (let guard = 0; guard < 1000; guard++) {
+        const c1 = (c + 1) % CYCLE_LAP;
+        const o1 = c === CYCLE_LAP - 1 ? o + D : o; // the next lap sits D octaves away in theory
+        if (ok(c1, o1)) {
+          c = c1;
+          o = o1;
+          idx++;
+          if (c === 0 && o === o0) {
+            if (better(cur.dev, idx, found)) found = { landings: cur.landings, dev: cur.dev, length: idx };
+            break;
+          }
+          continue;
+        }
+        // No room: wrap. Land on any playable octave that is genuinely back at the far end.
+        const here = meanAt(c, o);
+        for (const o2 of feasible[c1]!) {
+          const there = meanAt(c1, o2);
+          if (down ? there <= here : there >= here) continue;
+          const dev = cur.dev + Math.abs(edge[c1]! - o2);
+          const nidx = idx + 1;
+          const landings = [...cur.landings, o2];
+          if (c1 === 0 && o2 === o0) {
+            if (better(dev, nidx, found)) found = { landings, dev, length: nidx };
+            continue;
+          }
+          const k = keyOf(c1, o2);
+          const prev = best.get(k);
+          if (!prev || dev < prev.dev || (dev === prev.dev && nidx < prev.idx)) {
+            best.set(k, { dev, idx: nidx });
+            queue.push({ c: c1, o: o2, dev, idx: nidx, landings });
+          }
+        }
+        break;
+      }
+    }
+    return found;
+  };
+
+  let chosenStart: number | null = null;
+  let walk: Walk | null = null;
+  for (const o0 of starts) {
+    walk = closeFrom(o0);
+    if (walk) {
+      chosenStart = o0;
+      break;
+    }
+  }
+  if (!walk || chosenStart === null) {
+    return failure(0, "No closed loop found: the cycle cannot return to its first chord under the given constraints");
+  }
+
+  // Replay the winning walk to get the octave of every chord in the loop.
+  const length = walk.length;
+  const octaves: number[] = [chosenStart];
+  {
+    let c = 0;
+    let o = chosenStart;
+    let w = 0;
+    for (let idx = 1; idx < length; idx++) {
+      const c1 = (c + 1) % CYCLE_LAP;
+      const o1 = c === CYCLE_LAP - 1 ? o + D : o;
+      o = ok(c1, o1) ? o1 : walk.landings[w++]!;
+      c = c1;
+      octaves.push(o);
+    }
+  }
+
+  // Convert to shifts relative to each chord's theoretical pitch, then pick the best fingerings.
+  const cycle = generateCycle(scale, cycleId, { ...cycleOptions, length: length + 1 });
+  const shifts = octaves.map((o, j) => o - D * Math.floor(j / CYCLE_LAP));
   const path = planGuitarPath(
-    cycle.map((s) => s.voicing),
+    cycle.slice(0, length).map((s) => s.voicing),
     fb,
-    { ...base, octaveShift: "sweep", loop: true },
+    { constraints, weights, loop: true, octaveShifts: shifts, sweepDirection: down ? "down" : "up" },
   );
-  if (!path.ok) return fail(path);
+  if (!path.ok) return failure(path.failedStep, path.reason);
 
-  // 3. How far does the restart jump? Compare the true next chord with the first.
-  const last = path.steps[path.steps.length - 1]!;
-  const next = probe[length]!.voicing.pitches[0]!;
-  const jump = (midi(path.steps[0]!.voicing.pitches[0]!) - (midi(next) + 12 * last.octaveShift)) / 12;
+  const last = path.steps[length - 1]!;
+  const next = cycle[length]!.voicing.pitches[0]!;
+  // `|| 0` normalizes -0
+  const jump = (midi(path.steps[0]!.voicing.pitches[0]!) - (midi(next) + 12 * last.octaveShift)) / 12 || 0;
 
   return {
-    cycle,
+    cycle: cycle.slice(0, length),
     path,
     lapLength: CYCLE_LAP,
-    laps: playableRun >= CYCLE_LAP ? laps : 0,
+    laps: length / CYCLE_LAP,
     length,
-    innerWraps: path.steps.filter((s) => s.wrapped).length,
+    wraps: path.steps.filter((s) => s.wrapped).length,
+    startOctavesFromEdge: Math.abs(edge[0]! - chosenStart),
     restartJumpOctaves: jump,
   };
 }

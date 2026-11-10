@@ -1,7 +1,14 @@
 /**
- * Physical playability of a set of simultaneous notes on a fretboard.
- * One validator is the single source of truth: the realizer proposes
+ * Playability of a set of simultaneous notes on a fretboard, under configurable
+ * constraints. One validator is the single source of truth: the realizer proposes
  * candidates and this module accepts or rejects them.
+ *
+ * IMPORTANT: this is an approximation. It checks that strings exist and are not
+ * reused, string order and adjacency, exact pitches, the fret stretch (open strings
+ * excluded) and an ESTIMATED finger count (one barre on the lowest fret). A shape
+ * that passes is "valid under the configured constraints"; that is not a guarantee
+ * it is comfortable or even possible for every hand (it knows nothing about finger
+ * strength, hand size, thumb use, or the angle of a long stretch across strings).
  */
 import { midi, type Pitch } from "../theory/pitch";
 import { midiAt, type Fretboard } from "./fretboard";

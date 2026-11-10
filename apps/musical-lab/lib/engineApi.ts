@@ -12,6 +12,7 @@ import {
   makeFretboard,
   MusicTheoryError,
   planCycleOnGuitar,
+  planPerfectCycleLoop,
   parseNote,
   SCALE_TYPES,
   STANDARD_TUNING,
@@ -72,22 +73,39 @@ export const flattenGuitar = (g: GuitarVoicing) => ({
 export function cycleResponse(p: URLSearchParams) {
   const scale = scaleParam(p);
   const cycle = intParam(p, "cycle", 5, 2, 7);
-  const plan = planCycleOnGuitar(scale, cycle, fretboardParam(p), {
+  const board = fretboardParam(p);
+  const shared = {
     startDegree: intParam(p, "startDegree", 1, 1, 7),
     inversion: inversionParam(p),
-    length: intParam(p, "length", 7, 1, 120),
-    octaveShift: shiftParam(p),
     anchorFret: p.has("anchorFret") ? intParam(p, "anchorFret", 0, 0, 36) : undefined,
-    loop: p.get("loop") === "1" || p.get("loop") === "true",
     constraints: {
       maxFretSpan: intParam(p, "maxFretSpan", 4, 0, 6),
       maxFret: intParam(p, "maxFret", 17, 1, 36),
     },
-  });
+  };
+  // octaveShift=sweep is the perfect loop: its length is computed (a multiple of 21), not requested.
+  const perfect = shiftParam(p) === "sweep" ? planPerfectCycleLoop(scale, cycle, board, shared) : null;
+  const plan =
+    perfect ??
+    planCycleOnGuitar(scale, cycle, board, {
+      ...shared,
+      length: intParam(p, "length", 7, 1, 120),
+      octaveShift: shiftParam(p),
+      loop: p.get("loop") === "1" || p.get("loop") === "true",
+    });
   return {
     key: `${formatNote(scale.tonic)} ${scale.type}`,
     scale: scale.notes.map(formatNote),
     cycle,
+    loop: perfect
+      ? {
+          length: perfect.length,
+          laps: perfect.laps,
+          wraps: perfect.wraps,
+          startOctavesFromEdge: perfect.startOctavesFromEdge,
+          restartJumpOctaves: perfect.restartJumpOctaves,
+        }
+      : null,
     steps: plan.cycle.map((s, i) => {
       const planned = plan.path.ok ? plan.path.steps[i] : undefined;
       return {

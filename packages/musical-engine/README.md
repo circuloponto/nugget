@@ -3,15 +3,18 @@
 Deterministic music-theory and guitar-realization engine. TypeScript, zero
 runtime dependencies, no UI, no AI. Same input → same output.
 
-Two layers, one direction of dependency (`instrument` → `theory`, never back):
+Layers (`instrument` → `theory`; `ir` reads both; `time` and `audio` stand alone):
 
 | Layer | Knows about | Does **not** know about |
 |---|---|---|
 | `src/theory/` | spelled pitch, scales, triads, inversions, the six cycles | guitars, strings, frets |
 | `src/instrument/` | tunings, fretboard, playability, voice leading | key signatures or spelling (it only matches MIDI numbers; spelling travels with the abstract voicing) |
+| `src/time/` | exact rational time, meter, tuplets, polyrhythm, polymeter, phase, metric modulation | pitch, instruments |
+| `src/ir/` | MusicIR v1: events, voices, chords, relations, constraints, transformations; adapters from the engine; validation; (de)serialization; scheduling | how any of it was computed |
+| `src/audio/` | plucked-string synthesis as pure `Float32Array` functions | Web Audio, any player |
 
 ```
-npm test               # 255 tests
+npm test               # 382 tests
 npm run build          # ESM + CJS + .d.ts into dist/
 ```
 
@@ -48,6 +51,23 @@ playable position left, the whole voicing wraps to the far end (the top of the
 neck for descending cycles 2, 3, 5; the bottom for ascending cycles 4, 6, 7, see
 `cycleDrift`) and continues. `PlannedStep.wrapped` marks each wrap. Slow cycles
 (3, 6) need ~70 chords before they run out of neck; cycle 5 wraps about every 27.
+
+**`planPerfectCycleLoop(scale, cycle, fretboard, opts)`** is a sweep that closes
+on itself and never stops. The cycle keeps its real pitches and true next triad
+the whole way: it runs along the neck changing string sets, wraps to the far end
+whenever the next triad has no room left, and carries on with the *next triad of
+the cycle* (it never jumps back to chord 1). It ends when the triad after the last
+chord is the first triad again, in the same place, so playing on repeats the loop.
+
+Closing exactly needs the run to land on the first chord at a wrap or by simple
+continuation. Landing as high as possible rarely does that by chance (only ~30% of
+cases), so the search is free to pick the first chord's start among its highest
+placements and, if needed, which high octave a wrap lands in; it prefers the
+highest start, then the highest landings, then the shortest loop. Every
+cycle/inversion/start degree/key tried closes, in 21 or 42 chords with 1 or 2
+wraps. Result: `length`, `laps`, `wraps`, `startOctavesFromEdge`,
+`restartJumpOctaves` (0 = plain continuation, otherwise the last wrap lands on the
+first chord) and the usual `path` (with `closingCost`).
 
 Planner options worth knowing: `octaveShift` (`"sweep"` | `"whole-voicing"` | `"none"`),
 `anchorFret` (where the first chord sits), and `loop: true`, which treats the
@@ -89,9 +109,61 @@ The reference was used as a source of algorithms, not as ground truth. Changed:
 6. Greedy next-position search with area heuristics (its own guide says it rejects valid positions) → dynamic programming over the whole sequence.
 7. Cycle tables kept, but proven rather than trusted.
 
+## Temporal engine (`src/time/`)
+
+All symbolic time is an exact fraction of a whole note (`frac(1, 4)` = a quarter).
+Floats appear only in `toSeconds`, at the playback edge. So a triplet is exactly
+1/3 of its span, and 3/4 against 4/4 provably realign after 12 beats.
+
+- `rational.ts`: `frac`, `fadd`/`fmul`/`fdiv`, `fcmp`, `fmod`, `lcmFractions`, `parseFraction`/`fstr`. Normalized, overflow-checked (throws rather than wrong), BigInt comparison.
+- `meter.ts`: `parseMeter("7/8", [2, 2, 3])`, `barLength`, `pulsePositions`, `groupStarts`, `accentProfile` (downbeat 3 > group start 2 > pulse 1).
+- `rhythm.ts`: cells (`makeCell`/`validateCell`), `subdivide`, `tupletCell`/`tupletDuration`, nested tuplets (`nestedSubdivision`, `subdivideEvent`), `polyrhythm`, `polymeterRealignment`, `rotate` (phase; splits and ties notes that cross the bar, additive), `scaleCell` (augmentation/diminution), `concatCells`, `accentsFromGroups`.
+- `tempo.ts`: `toSeconds`, `metricModulation` (exact: 90 BPM with a quarter-note triplet becoming the beat is 135 BPM).
+
+## MusicIR v1 (`src/ir/`)
+
+A versioned, JSON-native document that can hold what `TriadVoicing` cannot: any
+number of voices, chord annotations, relations, constraints and the transformations
+that produced the material. **Existing engine objects map into it; they are not
+replaced by it.**
+
+- Times are exact fraction strings (`"3/8"`); pitches carry spelled name and MIDI (checked to agree); every entity has a unique id; provenance is `observed | inferred | generated | user`.
+- Adapters: `triadVoicingToIR`, `cycleToIR`, `cyclePlanToIR` (works with `planCycleOnGuitar` and `planPerfectCycleLoop`), and `irChordPitches` to read pitches back (tests prove they equal what the harmonic engine played).
+- `validateMusicIR(unknown)` reports every problem with a path and never throws: version, unique ids, unknown references, bad fractions, pitch/MIDI mismatch, canonical event order, overlap inside a single-line voice, chord segments, tempo/meter. `normalizeMusicIR` sorts; `serializeMusicIR`/`parseMusicIR` round-trip to byte-identical text.
+- `scheduleFromIR`/`chordTimeline` turn it into seconds through the temporal engine.
+
+## Audio (`src/audio/`)
+
+`synthesizePluck(midi)` / `synthesizeChord(midis)` produce Karplus-Strong plucked-string
+samples as plain `Float32Array`s: deterministic, and tuned with a fractional-delay
+all-pass to well under 1 cent over the whole guitar range (tested to 3). The Lab wraps
+them in Web Audio; any other player can do the same.
+
+Tone is three parameters (all 0..1 except `attackSeconds`):
+
+| Parameter | Effect | Lower means |
+|---|---|---|
+| `damping` | loop low-pass (symmetric 3-tap, so tuning never moves) | brighter, more strident |
+| `hardness` | how raw the initial noise burst is | rounder, less "pluck" |
+| `decay` | loop gain | shorter ring, less resonance |
+| `attackSeconds` | fade-in | n/a (higher = softer start) |
+
+`PLUCK_TONES` names three settings: `bright` (the original sound), `mellow` (the default:
+about 30% less bright, half the pluck spike, 35-45% shorter ring) and `soft` (no pluck
+spike, rings about half as long as the original). Measured, and locked in by tests.
+
+## About "playable"
+
+`validateVoicing` is an **approximation**: it checks that strings exist and are not
+reused, string order and adjacency, exact pitches, the fret stretch (open strings
+excluded) and an estimated finger count. A shape that passes is *valid under the
+configured constraints*. That is not a guarantee it is comfortable or possible for
+every hand. The Lab and the exported MusicIR both say so.
+
 ## Known limits (deliberate, for this phase)
 
-- Triads only (3 voices); close-position voicings are generated, but any 3-voice pitch set can be realized.
-- 12-TET and heptatonic scales (major, natural minor, harmonic minor). No melodic minor or modes yet.
+- The harmonic engine is triads only (3 voices) and heptatonic scales (major, natural minor, harmonic minor). Seventh chords, extensions, melodic gestures and generalized events are **not** forced into `TriadVoicing`: they belong in MusicIR, with new voicing/adapters beside the existing ones.
+- Rhythm exists as an engine and in MusicIR, but the cycles still play one chord per beat; no rhythmic phrasing is generated yet.
+- 12-TET only. Audio is a plucked-string model, not a sampled guitar.
 - No capo, no muted-string voicings, no barre geometry beyond finger counting.
 - Cycles 2/7's reference voice-leading tables are not the smoothest possible (4 scale steps of total motion vs 1 for cycles 3/6). They are kept for fidelity to the reference.

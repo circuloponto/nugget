@@ -46,6 +46,8 @@ select:focus, input:focus, button:focus-visible { outline: 2px solid var(--brass
 .chip.active b, .chip.active em { color: var(--surface); }
 .chip:disabled { opacity: 0.4; cursor: default; }
 .chip.wrapped { border-left: 4px solid var(--brass); }
+.export { margin-top: 8px; padding: 7px 12px; border: 1px solid var(--stone-light); background: var(--surface); border-radius: 6px; cursor: pointer; font: inherit; font-size: 13px; }
+.export:hover { background: var(--brass-glow); }
 .hint { margin: 0 0 14px; font-size: 14px; color: var(--ink-soft); }
 .wrap-note { align-self: center; color: var(--brass); font-size: 13px; padding: 0 4px; }
 .nav { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: 14px; color: var(--ink-soft); }
