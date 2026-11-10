@@ -1,0 +1,22 @@
+{
+  "name": "musical-lab-app",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "next dev",
+    "dev:webpack": "next dev --webpack",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@musical-lab/engine": "*",
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "latest",
+    "typescript": "^5.6.0"
+  }
+}
