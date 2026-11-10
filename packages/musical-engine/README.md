@@ -14,7 +14,7 @@ Layers (`instrument` → `theory`; `ir` reads both; `time` and `audio` stand alo
 | `src/audio/` | plucked-string synthesis as pure `Float32Array` functions | Web Audio, any player |
 
 ```
-npm test               # 399 tests
+npm test               # 669 tests
 npm run build          # ESM + CJS + .d.ts into dist/
 ```
 
@@ -182,6 +182,70 @@ Two models, chosen with `model`:
 `soft` (string, round, 1.1 s), `mellow` (string, 1.8 s) and `bright` (the original,
 strident string sound). Measured, and locked in by tests.
 
+## Musical grammar (Phase 3, `src/grammar/`)
+
+Music is modelled as a small vocabulary of composable relationships, not as stored licks. Five levels,
+each built from the one below:
+
+| Level | Where | What |
+|---|---|---|
+| Primitives | `theory/`, `time/`, `grammar/chords.ts` | spelled pitch, interval, exact duration, accent, voice, chords with sevenths, 9/11/13 and alterations |
+| Operations | `grammar/operations.ts` | `move`, `connect`, `approach`, `surround`, `neighbor`, `repeatPitch`, `leap`, `transpose`, `invert`, `arpeggiate`, `guideToneLine`; `hold`/`displace` for time (`line.ts`). Each returns its pitches **and a description of itself** |
+| Gestures | `grammar/phrase.ts` | arpeggiation, enclosure, approach are *compositions* of operations, recorded step by step |
+| Phrase construction | `grammar/phrase.ts`, `rhythmic.ts`, `motif.ts` | targets, rhythm plans, motifs and their transformations |
+| Structure | `grammar/structure.ts`, `counterpoint.ts` | climax, contour, tension, silence, arrival vs interruption; phrase relations; voice motion |
+
+**A note has four independent functions** (`NoteFunctions`): harmonic (its degree in the sounding chord), melodic
+(upper-chromatic-neighbor, arrival ...), metric (downbeat ... subdivision) and structural (target, outline,
+enclosure-member). D over Cmaj7 can be the ninth, a passing tone, an accented arrival and part of a motif at once.
+
+### Generation: `generatePhrase(spec)`
+
+Intention → operations → gestures → phrase. A target is *a degree of a chord arriving at an exact time*.
+The generator enumerates outlines (arpeggios built from the chord), embellishments (enclosures and approaches
+built with `surround`/`approach`) and **rhythm plans chosen for exactly that many notes**, so pitch and rhythm are
+decided together: the notes the pitch material needs fix which rhythms can carry it, and the rhythm's accents then
+judge the pitches (chord tones on strong beats, approach notes lighter than the arrival).
+
+- **Hard constraints** must hold or no candidate exists: target and exact arrival time, register, maximum leap, fret window, a real fingering (a hand-shift DP), and a rhythm that tiles the span exactly. If they cannot be met the result is `{ ok: false, reason }`, never an unplayable phrase.
+- **Soft preferences** (direction, step share, repetition, density, syncopation) only rank.
+- Ranking is a visible weighted sum of named parts with a reason each. **It measures adherence to those heuristics, not musical beauty**, and every score says so.
+- Deterministic: the same spec gives the same candidates. Candidates are chosen for diversity, not just top scores.
+- Transforms: `fixed.rhythm` (same timing, new pitches) and `fixed.template` (same notes and construction, new rhythm).
+
+`phraseSpecFromRequest` / `parsePhraseRequest` / `targetOptions` keep the UI free of music logic; a request stored in a saved
+file is treated as untrusted.
+
+### The semantic layer of MusicIR
+
+An **optional** `semantics` section (`targets`, `noteFunctions`, `gestures` with their construction `steps`, `motifs`,
+`phrases`, `phraseRelations`, `interpretations`). It references events by id and never copies pitch or time, so the events
+stay the single source of truth. Documents without it (every Phase 1 and 2 document) are unchanged and equally valid.
+`validateMusicIR` checks it: references exist, a target's arrival/pitch/degree match its note and chord, harmonic labels are
+true of the chord, motif statements really have the motif's intervals, and a **generated** gesture really has the shape its kind
+promises (an enclosure has a note one or two semitones above and below its target). A gesture touched by `editPhraseNote` is
+demoted to provenance `user`: history, not a promise. `serializeMusicIR` round-trips it byte for byte.
+
+### Analysis: `analyzeMelody(ir)`
+
+Events → relationships → possible gestures. Three things are kept apart:
+
+1. **Facts**: each note's degree in the sounding chord, metric position, size and direction of the moves in and out.
+2. **Interpretations**: enclosure, passing/neighbour/approach, appoggiatura, escape tone, anticipation, suspension/retardation (needs preparation, dissonance on the new chord **and** step resolution), cambiata, pedal, arpeggiation, guide-tone line, sequence. Each has a confidence built from named evidence (not a probability) and the evidence text. Several can hold for the same notes; rival readings of one note are linked as `alternatives`.
+3. **Unresolved**: non-chord tones no figure explains are listed, not forced into a label.
+
+Conventions worth knowing: "chromatic" in a reading's name means a semitone step by size, whether or not the note is in a key. An
+extension counts only when the chord's quality conventionally carries it **and the note is spelled as the chord spells it**
+(over G7, Eb is the b13; D# is not).
+
+### The Phrase Constructor (`/phrase` in the app)
+
+Pick a key and ii–V–I, a target (chord tone or extension of the last chord), outline and embellishment, rhythm feel and
+constraints; generate and audition candidates (with the reason for each score); inspect any note (its four functions, how it was
+built, the analyser's readings with evidence); edit pitch, length or onset (refused with the reasons if the document would become
+invalid); hold the rhythm or the pitches fixed and regenerate; see it on a guitar fretboard and piano-roll driven by the audio
+clock; save, reopen (the request is restored) and export.
+
 ## About "playable"
 
 `validateVoicing` is an **approximation**: it checks that strings exist and are not
@@ -193,7 +257,12 @@ every hand. The Lab and the exported MusicIR both say so.
 ## Known limits (deliberate, for this phase)
 
 - The harmonic engine is triads only (3 voices) and heptatonic scales (major, natural minor, harmonic minor). Seventh chords, extensions, melodic gestures and generalized events are **not** forced into `TriadVoicing`: they belong in MusicIR, with new voicing/adapters beside the existing ones.
-- Rhythm is user-edited step patterns applied identically to every chord; no generated phrasing, swing or per-chord patterns yet.
+- Phase 2 rhythm is user-edited step patterns applied identically to every chord. Phase 3 phrases have their own generated rhythm, but one phrase leads to **one target**: chained targets and longer forms are not generated yet.
+- Motif development (`motif.ts`: sequence, inversion, retrograde, augmentation, fragmentation, displacement, fitting a motif to a target) is a tested library, not yet driven by the generator or the UI.
+- Counterpoint and phrase structure only *calculate and describe* (motion, consonance, exchange, imitation, climax, tension, relations proposed with evidence). They state facts and proposals, not rules or verdicts; the tension curve is a labelled heuristic.
+- Analysis works on a single melodic voice against chord segments; it does not yet infer harmony from the notes.
+- Generation runs on the main thread (about half a second for the default request); the UI shows a busy state.
+- Pitch is spelled 12-TET throughout (`Pitch`/`Note`); the semantic layer does not itself assume equal temperament, but nothing else is implemented.
 - 12-TET only. Audio is a plucked-string model, not a sampled guitar.
 - No capo, no muted-string voicings, no barre geometry beyond finger counting.
 - Cycles 2/7's reference voice-leading tables are not the smoothest possible (4 scale steps of total motion vs 1 for cycles 3/6). They are kept for fidelity to the reference.

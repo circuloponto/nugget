@@ -28,7 +28,7 @@ const TRIAD_QUALITY: Record<string, { semis: [number, number]; suffix: string }>
   diminished: { semis: [3, 6], suffix: "dim" },
   augmented: { semis: [4, 8], suffix: "aug" },
 };
-const ROLE_INDEX: Record<string, number> = { root: 0, third: 1, fifth: 2 };
+const ROLE_INDEX: Record<string, number> = { root: 0, third: 1, fifth: 2, seventh: 3 };
 
 const tryNote = (name: string): Note | null => {
   try {

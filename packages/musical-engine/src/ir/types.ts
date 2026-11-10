@@ -147,6 +147,125 @@ export interface IRMeter {
   readonly unit: string;
 }
 
+// ── semantic layer (optional; absent in every Phase 1 and 2 document) ─────────
+//
+// A gesture, target or interpretation REFERENCES events by id and never duplicates them: the
+// events stay the single source of truth for pitch and time. A document without `semantics`
+// is exactly as valid as before.
+
+export const MUSIC_IR_SEMANTICS_VERSION = 1 as const;
+
+/** A desired musical event, not just a pitch: a degree of a chord, arriving at a time. */
+export interface IRTarget {
+  readonly id: string;
+  /** The chord segment it belongs to. */
+  readonly chord: string;
+  /** Degree label in that chord: "1" "3" "5" "7" "9" "b9" "#11" "13" ... */
+  readonly degree: string;
+  /** Exact pitch, when known (otherwise only the degree is fixed). */
+  readonly pitch?: IRPitch;
+  /** Allowed register as MIDI numbers. */
+  readonly register?: readonly [number, number];
+  /** Expected arrival time (exact fraction string). */
+  readonly arrival: string;
+  readonly metric?: string;
+  readonly melodicRole?: string;
+  readonly harmonicRole?: string;
+  readonly tension?: "resolve" | "build" | "neutral";
+  /** The event that realizes it, once there is one. */
+  readonly note?: string;
+  readonly constraints?: Readonly<Record<string, IRParam>>;
+}
+
+/** A note's several roles at once. The single-string `roles` on the event stays as the primary label. */
+export interface IRNoteFunctions {
+  readonly note: string;
+  readonly harmonic?: readonly string[];
+  readonly melodic?: readonly string[];
+  readonly metric?: string;
+  readonly structural?: readonly string[];
+}
+
+/** One recorded step of how a gesture was built. */
+export interface IRConstructionStep {
+  readonly op: string;
+  readonly params: Readonly<Record<string, IRParam>>;
+  /** Ids (notes or targets) it started from. */
+  readonly inputs?: readonly string[];
+  /** Note ids it produced. */
+  readonly outputs: readonly string[];
+}
+
+export interface IRGesture {
+  readonly id: string;
+  /** "arpeggiation", "enclosure", "approach", "neighbor", "passing", "anticipation", "guide-tone-line", ... */
+  readonly kind: string;
+  /** Notes it consists of, in time order. */
+  readonly notes: readonly string[];
+  readonly target?: string;
+  readonly steps: readonly IRConstructionStep[];
+  readonly params?: Readonly<Record<string, IRParam>>;
+  readonly provenance: IRProvenance;
+}
+
+export interface IRMotifStep {
+  readonly op: string;
+  readonly params: Readonly<Record<string, string | number>>;
+  readonly preserved: readonly string[];
+  readonly transformed: readonly string[];
+}
+
+export interface IRMotif {
+  readonly id: string;
+  readonly name?: string;
+  /** Semitone intervals between successive notes. */
+  readonly intervals: readonly number[];
+  /** Exact durations, as fraction strings. */
+  readonly durations: readonly string[];
+  readonly accents: readonly number[];
+  /** Occurrences in the document, each a list of note ids. */
+  readonly statements: readonly { readonly id: string; readonly notes: readonly string[]; readonly of?: string }[];
+  readonly lineage: readonly IRMotifStep[];
+}
+
+export interface IRPhrase {
+  readonly id: string;
+  readonly notes: readonly string[];
+  readonly label?: string;
+}
+
+export interface IRPhraseRelation {
+  readonly id: string;
+  readonly kind: "question-answer" | "antecedent-consequent" | "repetition" | "repetition-with-variation" | "continuation" | "tension-release" | "interruption" | "cadential-arrival" | "climax";
+  readonly from: string;
+  readonly to?: string;
+  readonly evidence?: readonly string[];
+}
+
+/** A reading of the music. It is a claim with evidence, never a fact. */
+export interface IRInterpretation {
+  readonly id: string;
+  readonly kind: string;
+  readonly notes: readonly string[];
+  readonly target?: string;
+  /** 0..1 */
+  readonly confidence: number;
+  readonly evidence: readonly string[];
+  /** Other interpretations of (some of) the same notes that cannot all be true together. */
+  readonly alternatives?: readonly string[];
+}
+
+export interface IRSemantics {
+  readonly version: typeof MUSIC_IR_SEMANTICS_VERSION;
+  readonly targets?: readonly IRTarget[];
+  readonly noteFunctions?: readonly IRNoteFunctions[];
+  readonly gestures?: readonly IRGesture[];
+  readonly motifs?: readonly IRMotif[];
+  readonly phrases?: readonly IRPhrase[];
+  readonly phraseRelations?: readonly IRPhraseRelation[];
+  readonly interpretations?: readonly IRInterpretation[];
+}
+
 export interface MusicIR {
   readonly version: typeof MUSIC_IR_VERSION;
   readonly id: string;
@@ -160,6 +279,8 @@ export interface MusicIR {
   readonly relations: readonly IRRelation[];
   readonly constraints: readonly IRConstraint[];
   readonly transformations: readonly IRTransformation[];
+  /** Optional musical-grammar layer: targets, gestures, motifs, phrase relations, interpretations. */
+  readonly semantics?: IRSemantics;
 }
 
 export interface IRIssue {

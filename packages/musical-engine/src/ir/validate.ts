@@ -6,6 +6,7 @@
 import { MusicTheoryError } from "../errors";
 import { midi, parsePitch } from "../theory/pitch";
 import { fadd, fcmp, flt, parseFraction, type Fraction } from "../time/rational";
+import { verifyGrammarSemantics } from "../grammar/verify";
 import { verifyMusicIRSemantics } from "./semantic";
 import { MUSIC_IR_VERSION, type IREvent, type IRIssue, type MusicIR } from "./types";
 
@@ -217,7 +218,12 @@ export function validateMusicIR(input: unknown): IRIssue[] {
   }
   // Semantic checks read several fields together, so they only make sense on a well-formed
   // document. (verifyMusicIRSemantics can also be called on its own.)
-  if (issues.length === 0) issues.push(...verifyMusicIRSemantics(input as unknown as MusicIR));
+  if (issues.length === 0) {
+    issues.push(...verifyMusicIRSemantics(input as unknown as MusicIR));
+    // the optional grammar layer (targets, gestures, motifs, interpretations), if the document has one
+    if (isObj(input.semantics)) issues.push(...verifyGrammarSemantics(input as unknown as MusicIR));
+    else if (input.semantics !== undefined) issues.push({ path: "semantics", message: "must be an object" });
+  }
   return issues;
 }
 

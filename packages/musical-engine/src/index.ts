@@ -44,3 +44,6 @@ export * from "./ir/playback";
 export * from "./ir/progression";
 export * from "./audio/render";
 export * from "./ir/view";
+
+// ── musical grammar (Phase 3) ─────────────────────────────────────────────
+export * from "./grammar";

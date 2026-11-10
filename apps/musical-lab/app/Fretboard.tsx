@@ -2,7 +2,7 @@
 
 import { formatPitch, midiAt, spellMidiInScale, type Fretboard as Board, type Scale } from "@musical-lab/engine";
 
-export type Role = "root" | "third" | "fifth";
+export type Role = "root" | "third" | "fifth" | "target" | "outline" | "embellish" | "other";
 
 export interface DisplayNote {
   string: number; // engine convention: 0 = lowest string
