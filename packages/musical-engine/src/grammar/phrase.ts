@@ -23,11 +23,12 @@ import { fadd, fcmp, fnum, frac, fstr, fsub, type Fraction } from "../time/ratio
 import type { IRConstructionStep } from "../ir/types";
 import { chordPitchesIn, classifyPitch, degreeOf, hasDegree, type Chord } from "./chords";
 import type { LineEvent, LineNote, MetricFrame, NoteFunctions } from "./line";
-import { contourOf, FOUR_FOUR_FRAME, isNote, metricPosition } from "./line";
+import { contourClassOf, contourOf, contourShape, FOUR_FOUR_FRAME, isNote, metricPosition, type ContourClass } from "./line";
 import {
   approach,
   arpeggiate,
   arpeggioPool,
+  connect,
   surround,
   type ArpDirection,
   type OpDescription,
@@ -52,6 +53,8 @@ export interface TargetSpec {
   readonly arrival?: Fraction;
   /** Default: until the end of that chord. */
   readonly duration?: Fraction;
+  /** Only target pitches inside this MIDI range (selects an octave). Default: the whole register. */
+  readonly range?: readonly [number, number];
 }
 
 export interface OutlineSpec {
@@ -63,17 +66,21 @@ export interface OutlineSpec {
   readonly counts?: readonly number[];
   /** Chord degrees the arpeggio uses. Default 1 3 5 7. */
   readonly degrees?: readonly string[];
+  /** An earlier arpeggio over an earlier chord (the ii before the V), played before the main outline. */
+  readonly lead?: { readonly chordIndex: number; readonly direction: ArpDirection | "any"; readonly counts?: readonly number[]; readonly degrees?: readonly string[] };
 }
 
 export type StepChoice = "chromatic" | "diatonic" | "mixed" | "any";
 
 export interface EmbellishmentSpec {
-  readonly kind: "enclosure" | "approach" | "none";
+  readonly kind: "enclosure" | "approach" | "run" | "none";
   readonly step: StepChoice;
   /** Which side an enclosure begins on, or an approach comes from. Default any. */
   readonly side?: Side | "any";
   /** Notes in an approach (1 or 2). Ignored by enclosures. Default 1. */
   readonly count?: number;
+  /** For a run: the chord whose tones it starts from. Default: the chord before the target's. */
+  readonly runFrom?: number;
 }
 
 export interface HardConstraints {
@@ -105,6 +112,8 @@ export interface PhraseSpec {
   readonly rhythm?: RhythmIntent;
   readonly hard: HardConstraints;
   readonly soft?: SoftPreferences;
+  /** A HARD requirement on the overall contour: its class, or its exact up/down shape. */
+  readonly contour?: { readonly cls?: ContourClass; readonly shape?: string };
   /** How many candidates to return. Default 5. */
   readonly candidates?: number;
   readonly tuning?: Tuning;
@@ -180,9 +189,47 @@ const chordAt = (prog: readonly ProgressionChord[], at: Fraction): ProgressionCh
 
 const sideRole = (kind: string, side: "upper" | "lower"): string => `${side}-${kind}-neighbor`;
 
+interface RunContext {
+  readonly chord: Chord | undefined;
+  readonly range: readonly [number, number];
+  readonly maxLeap: number;
+}
+
+/**
+ * A scalar run into the target: start on a tone of a chord and connect to the target by scale steps
+ * (`connect`), so the notes in between are passing tones. The start must be at least a minor third
+ * from the target, otherwise there is nothing to connect.
+ */
+function runVariants(target: Pitch, space: PitchSpace, ctx: RunContext | undefined): Variant[] {
+  if (!ctx?.chord || space.scale.length === 0) return [];
+  const found: { v: Variant; d: number }[] = [];
+  const seen = new Set<string>();
+  for (const start of chordPitchesIn(ctx.chord, ctx.range[0], ctx.range[1])) {
+    const d = midi(start) - midi(target);
+    if (Math.abs(d) < 3 || Math.abs(d) > ctx.maxLeap) continue;
+    const mid = connect(start, target, "diatonic", { space });
+    const pitches = [start, ...mid.pitches];
+    if (pitches.length < 2 || pitches.length > 6) continue;
+    const key = pitches.map(midi).join(",");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    found.push({
+      d,
+      v: {
+        pitches,
+        roles: ["run-start", ...mid.pitches.map(() => "passing-tone")],
+        label: `scale run ${d > 0 ? "down" : "up"} from ${formatPitch(start)}`,
+        description: mid.description,
+      },
+    });
+  }
+  return found.sort((a, b) => Math.abs(a.d) - Math.abs(b.d) || a.d - b.d).slice(0, 4).map((x) => x.v);
+}
+
 /** Embellishment variants for one target pitch, in a fixed order, with duplicates (same pitches) removed. */
-function embellishmentVariants(target: Pitch, spec: EmbellishmentSpec, space: PitchSpace): Variant[] {
+function embellishmentVariants(target: Pitch, spec: EmbellishmentSpec, space: PitchSpace, ctx?: RunContext): Variant[] {
   if (spec.kind === "none") return [];
+  if (spec.kind === "run") return runVariants(target, space, ctx);
   const out: Variant[] = [];
   const seen = new Set<string>();
   const add = (v: Variant) => {
@@ -294,8 +341,10 @@ export function generatePhrase(spec: PhraseSpec): PhraseResult {
 
   // 1. target pitches inside the register
   const targetDegree = degreeOf(targetEntry.chord, spec.target.degree);
-  const targetPitches = chordPitchesIn(targetEntry.chord, lo, hi, [spec.target.degree]);
-  if (targetPitches.length === 0) return { ok: false, reason: `No ${targetDegree.note.letter}-class pitch lies in the register ${lo}-${hi}.` };
+  const [tlo, thi] = spec.target.range ?? [lo, hi];
+  const targetPitches = chordPitchesIn(targetEntry.chord, Math.max(lo, tlo), Math.min(hi, thi), [spec.target.degree]);
+  if (targetPitches.length === 0) return { ok: false, reason: `No ${targetDegree.note.letter}-class pitch lies in the register ${Math.max(lo, tlo)}-${Math.min(hi, thi)}.` };
+  const runChord = prog[spec.embellishment.runFrom ?? spec.target.chordIndex - 1]?.chord;
 
   // 2. the outline's chord and pool
   const outlineChordIndex = spec.outline ? (spec.outline.chordIndex ?? spec.target.chordIndex - 1) : -1;
@@ -319,13 +368,14 @@ export function generatePhrase(spec: PhraseSpec): PhraseResult {
   let sawPitches = false;
 
   for (const T of targetPitches) {
-    const embellish = spec.fixed?.template ? [null] : embellishmentVariants(T, spec.embellishment, spec.space);
+    const embellish = spec.fixed?.template ? [null] : embellishmentVariants(T, spec.embellishment, spec.space, { chord: runChord, range: [lo, hi], maxLeap });
     const variants: (Variant | null)[] = embellish.length ? embellish : [null];
 
     for (const E of variants) {
       // outline variants that connect well to E (or to T when there is no embellishment)
       const entry: Pitch = E ? E.pitches[0]! : T;
-      type O = { pitches: Pitch[]; label: string; description: OpDescription };
+      type Seg = { count: number; chordIndex: number; label: string; description: OpDescription };
+      type O = { pitches: Pitch[]; label: string; description: OpDescription; segments?: Seg[] };
       const outlines: O[] = [];
       if (spec.fixed?.template) {
         outlines.push({ pitches: [], label: "fixed", description: { op: "fixed", params: {} } });
@@ -346,6 +396,40 @@ export function generatePhrase(spec: PhraseSpec): PhraseResult {
             outlines.push(...local.slice(0, 4));
           }
         }
+        // a lead arpeggio over an earlier chord, joined to the main outline
+        const lead = spec.outline.lead;
+        const leadEntry = lead ? prog[lead.chordIndex] : undefined;
+        if (lead && leadEntry) {
+          const mains = outlines.splice(0, outlines.length);
+          const leadDirs: ArpDirection[] = lead.direction === "any" ? ["up", "down", "updown", "mixed"] : [lead.direction];
+          const poolL = arpeggioPool(leadEntry.chord, [lo, hi], lead.degrees);
+          for (const m of mains.slice(0, 12)) {
+            for (const count of lead.counts ?? [2, 3]) {
+              for (const direction of leadDirs) {
+                const local: { r: ReturnType<typeof arpeggiate>; leap: number }[] = [];
+                for (let startIndex = 0; startIndex < poolL.length; startIndex++) {
+                  const r = arpeggiate(leadEntry.chord, { direction, count, range: [lo, hi], ...(lead.degrees ? { degrees: lead.degrees } : {}), startIndex });
+                  const leap = Math.abs(midi(m.pitches[0]!) - midi(r.pitches[r.pitches.length - 1]!));
+                  if (leap > maxLeap || leap === 0) continue;
+                  local.push({ r, leap });
+                }
+                local.sort((a, b) => a.leap - b.leap || midi(a.r.pitches[0]!) - midi(b.r.pitches[0]!));
+                for (const { r } of local.slice(0, 2)) {
+                  const leadLabel = `${direction} ${count}-note arpeggio of ${leadEntry.chord.symbol}`;
+                  outlines.push({
+                    pitches: [...r.pitches, ...m.pitches],
+                    label: `${leadLabel}, then ${m.label}`,
+                    description: m.description,
+                    segments: [
+                      { count: r.pitches.length, chordIndex: lead.chordIndex, label: leadLabel, description: r.description },
+                      { count: m.pitches.length, chordIndex: outlineChordIndex, label: m.label, description: m.description },
+                    ],
+                  });
+                }
+              }
+            }
+          }
+        }
       } else {
         outlines.push({ pitches: [], label: "no outline", description: { op: "none", params: {} } });
       }
@@ -355,6 +439,8 @@ export function generatePhrase(spec: PhraseSpec): PhraseResult {
         const before: Pitch[] = tpl ? tpl.slice(0, -1) : [...O.pitches, ...(E?.pitches ?? [])];
         const tgt: Pitch = tpl ? tpl[tpl.length - 1]! : T;
         const seq = [...before, tgt];
+        if (spec.contour?.cls !== undefined && contourClassOf(seq) !== spec.contour.cls) continue;
+        if (spec.contour?.shape !== undefined && contourShape(seq) !== spec.contour.shape) continue;
         if (spec.avoidPitchSequences?.some((a) => a.length === seq.length && a.every((m, i) => m === midi(seq[i]!)))) continue;
         sawPitches = true;
         // hard: register and leaps
@@ -367,6 +453,22 @@ export function generatePhrase(spec: PhraseSpec): PhraseResult {
         if (!finger) continue;
 
         for (const plan of plansFor(before.length)) {
+          // each outline segment's notes must sound during its own chord (an arpeggio of G7 belongs over G7)
+          if (!spec.fixed?.template && O.pitches.length > 0) {
+            const onsets = plan.slots.filter((x) => !x.rest).map((x) => fadd(spec.start, x.offset));
+            const segs: { count: number; chordIndex: number }[] = O.segments ?? [{ count: O.pitches.length, chordIndex: outlineChordIndex }];
+            let at = 0;
+            let ok = true;
+            for (const sg of segs) {
+              const win = prog[sg.chordIndex];
+              for (let k = 0; k < sg.count && win; k++) {
+                const o = onsets[at + k];
+                if (!o || fcmp(o, win.onset) < 0 || fcmp(o, fadd(win.onset, win.duration)) >= 0) ok = false;
+              }
+              at += sg.count;
+            }
+            if (!ok) continue;
+          }
           considered++;
           const built = buildCandidate(spec, prog, frame, plan, before, tgt, targetDegree.label, spec.target.chordIndex, arrival, O.pitches.length, O, E, finger, targetEntry, spec.fixed?.template);
           candidates.push(built);
@@ -434,7 +536,7 @@ function buildCandidate(
   targetChordIndex: number,
   arrival: Fraction,
   outlineCount: number,
-  O: { label: string; description: OpDescription },
+  O: { label: string; description: OpDescription; segments?: { count: number; chordIndex: number; label: string; description: OpDescription }[] },
   E: Variant | null,
   finger: Fingering,
   targetEntry: ProgressionChord,
@@ -445,24 +547,26 @@ function buildCandidate(
   let ni = 0;
   let ri = 0;
   const idOf = (i: number) => `n-mel-${i + 1}`;
-  const hitRoles: { gesture: "outline" | "embellishment" | "target"; role: string }[] = [
-    ...before.slice(0, outlineCount).map(() => ({ gesture: "outline" as const, role: "arpeggio-tone" })),
+  const segments = O.segments ?? (outlineCount ? [{ count: outlineCount, chordIndex: targetChordIndex - 1, label: O.label, description: O.description }] : []);
+  const segGestureId = (si: number): string => (segments.length > 1 && si < segments.length - 1 ? `g-outline-lead${segments.length > 2 ? si + 1 : ""}` : "g-outline");
+  const hitRoles: { gesture: "outline" | "embellishment" | "target"; role: string; gid?: string }[] = [
+    ...segments.flatMap((sg, si) => Array.from({ length: sg.count }, () => ({ gesture: "outline" as const, role: "arpeggio-tone", gid: segGestureId(si) }))),
     ...(E ? E.roles.map((role) => ({ gesture: "embellishment" as const, role })) : []),
   ];
   const tplNotes = template ? template.events.filter(isNote) : [];
 
-  const mk = (rawPitch: Pitch, onset: Fraction, duration: Fraction, info: { gesture: "outline" | "embellishment" | "target"; role: string }, index: number): LineNote => {
+  const mk = (rawPitch: Pitch, onset: Fraction, duration: Fraction, info: { gesture: "outline" | "embellishment" | "target"; role: string; gid?: string }, index: number): LineNote => {
     const entry = chordAt(prog, onset) ?? targetEntry;
     const deg = classifyPitch(entry.chord, rawPitch);
     // a chord tone is spelled the way its chord spells it (an Eb, not a D#, over Cm7)
-    const pitch = deg && deg.kind === "chord-tone" && formatPitch(rawPitch).replace(/-?d+$/, "") !== formatNote(deg.note) ? pitchFromMidi(midi(rawPitch), deg.note) : rawPitch;
+    const pitch = deg && deg.kind === "chord-tone" && formatPitch(rawPitch).replace(/-?\d+$/, "") !== formatNote(deg.note) ? pitchFromMidi(midi(rawPitch), deg.note) : rawPitch;
     const mp = metricPosition(onset, frame);
     const harmonic = deg ? [deg.role] : [];
     const tpl = index < tplNotes.length ? tplNotes[index] : undefined;
-    const structural = tpl ? [...tpl.functions.structural] : info.gesture === "target" ? ["target"] : info.gesture === "outline" ? ["outline"] : [E?.label.includes("enclosure") ? "enclosure-member" : "approach-note"];
+    const structural = tpl ? [...tpl.functions.structural] : info.gesture === "target" ? ["target"] : info.gesture === "outline" ? ["outline"] : [E?.label.includes("enclosure") ? "enclosure-member" : E?.label.includes("scale run") ? "run-note" : "approach-note"];
     const melodic = tpl ? [...tpl.functions.melodic] : info.gesture === "target" ? ["arrival"] : [info.role];
     const functions: NoteFunctions = { harmonic, melodic, metric: mp.label, structural };
-    return { kind: "note", id: idOf(index), pitch, onset, duration, accent: mp.accent, functions, position: finger.positions[index]!, gesture: tpl?.gesture ?? (info.gesture === "target" ? "g-target" : info.gesture === "outline" ? "g-outline" : "g-embellishment") };
+    return { kind: "note", id: idOf(index), pitch, onset, duration, accent: mp.accent, functions, position: finger.positions[index]!, gesture: tpl?.gesture ?? info.gid ?? (info.gesture === "target" ? "g-target" : info.gesture === "outline" ? "g-outline" : "g-embellishment") };
   };
 
   for (const slot of plan.slots) {
@@ -483,21 +587,25 @@ function buildCandidate(
 
   // gestures: each records the operations that built it (a rhythm-only transform keeps the template's)
   const gestures: GestureRecord[] = template ? [...template.gestures] : [];
-  const outlineIds = hits.slice(0, outlineCount).map((n) => n.id);
   const embIds = hits.slice(outlineCount, before.length).map((n) => n.id);
-  if (!template && outlineIds.length) {
-    gestures.push({
-      id: "g-outline",
-      kind: "arpeggiation",
-      notes: outlineIds,
-      steps: [{ op: O.description.op, params: { ...O.description.params }, outputs: outlineIds }],
-      params: { chord: prog[Math.max(0, targetChordIndex - 1)]?.chord.symbol ?? "" },
+  if (!template) {
+    let at = 0;
+    segments.forEach((sg, si) => {
+      const ids = hits.slice(at, at + sg.count).map((n) => n.id);
+      at += sg.count;
+      gestures.push({
+        id: segGestureId(si),
+        kind: "arpeggiation",
+        notes: ids,
+        steps: [{ op: sg.description.op, params: { ...sg.description.params }, outputs: ids }],
+        params: { chord: prog[sg.chordIndex]?.chord.symbol ?? "" },
+      });
     });
   }
   if (!template && E && embIds.length) {
     gestures.push({
       id: "g-embellishment",
-      kind: E.label.includes("enclosure") ? "enclosure" : "approach",
+      kind: E.label.includes("enclosure") ? "enclosure" : E.label.includes("scale run") ? "scalar-run" : "approach",
       notes: embIds,
       target: "tg-1",
       steps: [

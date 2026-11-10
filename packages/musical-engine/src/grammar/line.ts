@@ -157,3 +157,37 @@ export function firstOverlap(line: readonly LineEvent[]): [string, string] | nul
   }
   return null;
 }
+
+// ── contour as a class and as a shape ─────────────────────────────────────
+export type ContourClass = "ascending" | "descending" | "arch" | "valley" | "level";
+export const CONTOUR_CLASSES: readonly ContourClass[] = ["ascending", "descending", "arch", "valley", "level"];
+
+/** The up/down/level pattern of a pitch sequence, one letter per move: "uudl". Two phrases with the same shape move the same way. */
+export function contourShape(pitches: readonly Pitch[]): string {
+  return pitches
+    .slice(1)
+    .map((p, i) => (midi(p) > midi(pitches[i]!) ? "u" : midi(p) < midi(pitches[i]!) ? "d" : "l"))
+    .join("");
+}
+
+/**
+ * A coarse reading of the overall shape: an arch has its highest note inside the phrase, a valley its lowest;
+ * otherwise the net movement decides (3 semitones or more is a direction, less is level). The ends of a phrase
+ * that merely turn around its target (an enclosure) do not make it an arch: the extreme must exceed both
+ * ends by at least 2 semitones.
+ */
+export function contourClassOf(pitches: readonly Pitch[]): ContourClass {
+  if (pitches.length < 2) return "level";
+  const ms = pitches.map(midi);
+  const first = ms[0]!;
+  const last = ms[ms.length - 1]!;
+  const hi = Math.max(...ms);
+  const lo = Math.min(...ms);
+  const hiIdx = ms.indexOf(hi);
+  const loIdx = ms.indexOf(lo);
+  const interior = (i: number) => i > 0 && i < ms.length - 1;
+  if (interior(hiIdx) && hi - Math.max(first, last) >= 2) return "arch";
+  if (interior(loIdx) && Math.min(first, last) - lo >= 2) return "valley";
+  const net = last - first;
+  return net >= 3 ? "ascending" : net <= -3 ? "descending" : "level";
+}

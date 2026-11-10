@@ -73,6 +73,14 @@ export interface RhythmIntent {
   readonly density?: number;
   /** Shape of the density across the span. Default "any". */
   readonly shape?: "even" | "accelerating" | "decelerating" | "any";
+  /** Every one of these tags must appear in the plan's gestures (a HARD requirement, e.g. "triplet"). */
+  readonly require?: readonly RhythmTag[];
+  /** None of these tags may appear (a HARD requirement). */
+  readonly forbid?: readonly RhythmTag[];
+  /** The plan must end in silence just before the target arrives (delayed resolution). */
+  readonly endsWithRest?: boolean;
+  /** The plan must begin with silence (the phrase enters late). */
+  readonly startsWithRest?: boolean;
 }
 
 export interface RhythmPlanSlot {
@@ -99,6 +107,18 @@ const allowed = (g: RhythmicGesture, intent: RhythmIntent): boolean => {
 
 /** The one definition of "syncopated" used for both ranking and reporting: a syncopated, dotted or rest-bearing figure. */
 const isOffbeatFigure = (g: RhythmicGesture | undefined): boolean => !!g && (g.tags.includes("syncopated") || g.tags.includes("dotted") || g.tags.includes("rest"));
+
+/** Do a plan's gestures meet the hard requirements of the intent? */
+function satisfies(gs: readonly RhythmicGesture[], intent: RhythmIntent): boolean {
+  for (const tag of intent.require ?? []) if (!gs.some((g) => g.tags.includes(tag))) return false;
+  for (const tag of intent.forbid ?? []) if (gs.some((g) => g.tags.includes(tag))) return false;
+  if (intent.endsWithRest) {
+    const lastSlot = gs[gs.length - 1]?.slots[gs[gs.length - 1]!.slots.length - 1];
+    if (!lastSlot?.rest) return false;
+  }
+  if (intent.startsWithRest && !gs[0]?.slots[0]?.rest) return false;
+  return true;
+}
 
 const hitsIn = (g: RhythmicGesture): number => g.slots.filter((s) => !s.rest).length;
 const density = (g: RhythmicGesture): number => hitsIn(g) / (fnum(g.length) * 4); // notes per quarter beat
@@ -129,6 +149,9 @@ export function rhythmPlans(span: Fraction, hits: number, intent: RhythmIntent =
     }
   };
   walk(span, hits, []);
+  const accepted = found.filter((gs) => satisfies(gs, intent));
+  found.length = 0;
+  found.push(...accepted);
 
   const want = intent.density ?? 2;
   const syncWant = intent.syncopation ?? 0.3;
@@ -164,4 +187,15 @@ export function rhythmPlans(span: Fraction, hits: number, intent: RhythmIntent =
 export function syncopationOf(plan: RhythmPlan): number {
   const tagged = plan.gestures.filter((id) => isOffbeatFigure(RHYTHMIC_GESTURES.find((x) => x.id === id)));
   return plan.gestures.length ? tagged.length / plan.gestures.length : 0;
+}
+
+/** The tags a plan actually carries: what its rhythm IS, measured, whatever it was asked to be. */
+export function rhythmTraits(plan: RhythmPlan): { tags: RhythmTag[]; endsWithRest: boolean; startsWithRest: boolean } {
+  const tags = new Set<RhythmTag>();
+  for (const id of plan.gestures) for (const t of RHYTHMIC_GESTURES.find((g) => g.id === id)?.tags ?? []) tags.add(t);
+  return {
+    tags: [...tags].sort(),
+    endsWithRest: plan.slots.length > 0 && plan.slots[plan.slots.length - 1]!.rest,
+    startsWithRest: plan.slots.length > 0 && plan.slots[0]!.rest,
+  };
 }

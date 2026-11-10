@@ -10,7 +10,7 @@ export function noteKind(ir: MusicIR, note: IRNoteEvent): NoteKind {
   const f = ir.semantics?.noteFunctions?.find((x) => x.note === note.id);
   const structural = f?.structural ?? (note.roles?.structural ? [note.roles.structural] : []);
   if (structural.includes("target")) return "target";
-  if (structural.includes("enclosure-member") || structural.includes("approach-note")) return "embellish";
+  if (structural.includes("enclosure-member") || structural.includes("approach-note") || structural.includes("run-note")) return "embellish";
   if (structural.includes("outline")) return "outline";
   return "other";
 }

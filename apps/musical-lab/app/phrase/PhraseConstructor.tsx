@@ -3,33 +3,41 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   analyzeMelody,
+  BAND_NAMES,
+  CONTOUR_CHOICES,
   DEFAULT_PHRASE_REQUEST,
+  DENSITIES,
+  developRequest,
   editPhraseNote,
+  explorePhrases,
   formatPitch,
   frac,
   fstr,
-  generatePhrase,
+  generationSpaceFromRequest,
   irTuning,
+  LENGTHS,
   makeFretboard,
   makeTuning,
-  midi,
   parseFraction,
   parseMusicIR,
   parsePhraseRequest,
-  phraseSpecFromRequest,
   phraseToIR,
   PLUCK_TONES,
   renderDocument,
+  RHYTHM_CHARACTERS,
   scheduleFrames,
   serializeMusicIR,
   spellInSpace,
   STANDARD_TUNING,
+  STRATEGIES,
   targetOptions,
   withInterpretations,
+  type ExploreStats,
+  type ExploredPhrase,
   type IRIssue,
   type IRNoteEvent,
+  type LockAspect,
   type MusicIR,
-  type PhraseCandidate,
   type PhraseRequest,
 } from "@musical-lab/engine";
 import Fretboard, { type DisplayNote, type Role } from "../Fretboard";
@@ -38,9 +46,20 @@ import PhraseRoll, { noteKind } from "./PhraseRoll";
 
 const TONICS = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 const DURATIONS = ["1/16", "1/12", "1/8", "3/16", "1/6", "1/4", "3/8", "1/2", "3/4", "1"];
+const COUNTS = [3, 5, 6, 7, 8, 10, 12];
 const MELODY = "melody";
 const midiName = (m: number): string => formatPitch(spellInSpace(m, { scale: [] }));
 const REGISTER = Array.from({ length: 49 }, (_, i) => 40 + i);
+
+const LOCKS: { aspect: LockAspect; label: string; hint: string }[] = [
+  { aspect: "target", label: "target", hint: "same degree and the same octave" },
+  { aspect: "register", label: "register", hint: "same octave band" },
+  { aspect: "strategy", label: "melodic strategy", hint: "same outline / embellishment" },
+  { aspect: "rhythm", label: "rhythm", hint: "every onset and length exactly" },
+  { aspect: "contour", label: "contour", hint: "the same up/down shape" },
+  { aspect: "density", label: "density", hint: "same notes per beat class" },
+  { aspect: "length", label: "length", hint: "same phrase length" },
+];
 
 type Loaded = { name: string } | null;
 
@@ -56,6 +75,24 @@ function describeStep(step: { op: string; params: Readonly<Record<string, unknow
   return p ? `${step.op}(${p})` : step.op;
 }
 
+/** "explore all" or one value: the UI form of a dimension of the generation space. */
+function Dim<T extends string>({ label, value, options, onChange, testid }: { label: string; value: readonly T[] | "all"; options: readonly { id: T; name: string }[]; onChange: (v: readonly T[] | "all") => void; testid: string }) {
+  const current = value === "all" || value.length !== 1 ? "" : value[0]!;
+  return (
+    <label>
+      {label}
+      <select value={current} onChange={(e) => onChange(e.target.value === "" ? "all" : [e.target.value as T])} data-testid={testid}>
+        <option value="">explore all</option>
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export default function PhraseConstructor() {
   const playerRef = useRef<LabPlayer | null>(null);
   const playheadRef = useRef<HTMLDivElement | null>(null);
@@ -67,9 +104,9 @@ export default function PhraseConstructor() {
   const [sampleRate, setSampleRate] = useState(44100);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
-  const [candidates, setCandidates] = useState<PhraseCandidate[]>([]);
-  const [considered, setConsidered] = useState(0);
-  const [candidate, setCandidate] = useState<PhraseCandidate | null>(null);
+  const [candidates, setCandidates] = useState<ExploredPhrase[]>([]);
+  const [stats, setStats] = useState<ExploreStats | null>(null);
+  const [candidate, setCandidate] = useState<ExploredPhrase | null>(null);
   const [ir, setIr] = useState<MusicIR | null>(null);
   const [edited, setEdited] = useState(false);
   const [loaded, setLoaded] = useState<Loaded>(null);
@@ -80,12 +117,14 @@ export default function PhraseConstructor() {
   const [sounding, setSounding] = useState<string[]>([]);
   const [pxPerSecond, setPxPerSecond] = useState(110);
   const [attachAnalysis, setAttachAnalysis] = useState(true);
-  const [transformNote, setTransformNote] = useState("");
+  const [note, setNote] = useState("");
   const [openScore, setOpenScore] = useState<string | null>(null);
   const [audioMs, setAudioMs] = useState(0);
+  const [locks, setLocks] = useState<LockAspect[]>(["target"]);
 
-  const spec = useMemo(() => phraseSpecFromRequest(req), [req]);
   const targets = useMemo(() => targetOptions(req.tonic, req.mode), [req.tonic, req.mode]);
+  const e = req.exploration;
+  const setE = (patch: Partial<PhraseRequest["exploration"]>) => setReq((r) => ({ ...r, exploration: { ...r.exploration, ...patch } }));
 
   // ── audio ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -127,7 +166,7 @@ export default function PhraseConstructor() {
           const x = frame * pxPerFrame;
           if (x < sc.scrollLeft + 24 || x > sc.scrollLeft + sc.clientWidth - 80) sc.scrollLeft = Math.max(0, x - 100);
         }
-        const now = p.isPlaying ? schedule.events.filter((e) => e.voice === MELODY && e.startFrame <= frame && frame < e.endFrame).map((e) => e.id) : [];
+        const now = p.isPlaying ? schedule.events.filter((ev) => ev.voice === MELODY && ev.startFrame <= frame && frame < ev.endFrame).map((ev) => ev.id) : [];
         const key = now.join(",");
         if (key !== lastKey) {
           lastKey = key;
@@ -156,75 +195,61 @@ export default function PhraseConstructor() {
     setSounding([]);
   };
 
-  // ── generating, choosing, transforming ───────────────────────────────────
-  const adopt = useCallback(
-    (c: PhraseCandidate, forReq: PhraseRequest) => {
-      const s = phraseSpecFromRequest(forReq);
-      const doc = phraseToIR(c, s, { bpm: forReq.bpm, request: forReq as unknown as Record<string, unknown> });
-      setCandidate(c);
-      setIr(doc);
-      setEdited(false);
-      setLoaded(null);
-      setSelected(c.targetNote);
-      setEditError([]);
-      setLoadError([]);
-    },
-    [],
-  );
+  // ── exploring, choosing, developing ──────────────────────────────────────
+  const adopt = useCallback((c: ExploredPhrase, forReq: PhraseRequest) => {
+    const doc = phraseToIR(c, c.spec, { bpm: forReq.bpm, request: forReq as unknown as Record<string, unknown> });
+    setCandidate(c);
+    setIr(doc);
+    setEdited(false);
+    setLoaded(null);
+    setSelected(c.targetNote);
+    setEditError([]);
+    setLoadError([]);
+  }, []);
 
-  const run = (build: () => ReturnType<typeof generatePhrase>, label: string, after?: (list: PhraseCandidate[]) => PhraseCandidate[]) => {
+  const explore = (forReq: PhraseRequest, message = "") => {
     setBusy(true);
     setFailure(null);
-    setTransformNote("");
+    setNote("");
     setTimeout(() => {
-      const r = build();
+      const r = explorePhrases(generationSpaceFromRequest(forReq));
       if (!r.ok) {
         setFailure(r.reason);
         setBusy(false);
         return;
       }
-      const list = after ? after([...r.candidates]) : [...r.candidates];
-      if (list.length === 0) {
-        setFailure("Nothing new could be built that way: every result repeated what you already have.");
-        setBusy(false);
-        return;
-      }
-      setCandidates(list);
-      setConsidered(r.considered);
-      adopt(list[0]!, req);
-      if (label) setTransformNote(label);
+      setReq(forReq);
+      setCandidates([...r.candidates]);
+      setStats(r.stats);
+      adopt(r.candidates[0]!, forReq);
+      setNote(message);
       setBusy(false);
     }, 20);
   };
 
-  const generate = () => run(() => generatePhrase(spec), "");
-
-  const keepRhythm = () => {
+  const generate = () => explore(req);
+  const newSeed = () => explore({ ...req, exploration: { ...e, seed: e.seed + 1 } }, `New seed ${e.seed + 1}: a different, equally reproducible set.`);
+  const develop = () => {
     if (!candidate) return;
-    const exact = candidate.choices.pitches.map(midi);
-    run(() => generatePhrase({ ...spec, fixed: { rhythm: candidate.choices.rhythm }, avoidPitchSequences: [exact] }), "Same rhythm, new pitches: every note keeps its exact time; the harmonic goal is unchanged.");
-  };
-
-  const keepPitches = () => {
-    if (!candidate) return;
-    const before = candidate.choices.rhythm.id;
-    run(
-      () => generatePhrase({ ...spec, fixed: { template: candidate } }),
-      "Same notes and construction, new rhythm: the target still arrives at its exact time.",
-      (list) => list.filter((c) => c.choices.rhythm.id !== before),
-    );
+    const next = developRequest(req, candidate, locks);
+    explore(next, locks.length ? `Variations of phrase ${candidate.id.replace("phrase-", "#")} with ${locks.join(", ")} held fixed (seed ${next.exploration.seed}).` : `Seed ${next.exploration.seed}: nothing locked.`);
   };
 
   // ── editing one note ─────────────────────────────────────────────────────
   const edit = (change: { midi?: number; duration?: string; onsetShift?: string }) => {
     if (!ir || !selected) return;
-    const ev = ir.events.find((e): e is IRNoteEvent => e.kind === "note" && e.id === selected);
+    const ev = ir.events.find((x): x is IRNoteEvent => x.kind === "note" && x.id === selected);
     if (!ev) return;
-    const res = editPhraseNote(ir, selected, {
-      ...(change.midi !== undefined ? { midi: change.midi } : {}),
-      ...(change.duration ? { duration: parseFraction(change.duration) } : {}),
-      ...(change.onsetShift ? { onset: addFraction(ev.onset, change.onsetShift) } : {}),
-    }, { scale: [] });
+    const res = editPhraseNote(
+      ir,
+      selected,
+      {
+        ...(change.midi !== undefined ? { midi: change.midi } : {}),
+        ...(change.duration ? { duration: parseFraction(change.duration) } : {}),
+        ...(change.onsetShift ? { onset: addFraction(ev.onset, change.onsetShift) } : {}),
+      },
+      { scale: [] },
+    );
     if (!res.ok) {
       setEditError(res.issues);
       return;
@@ -242,7 +267,7 @@ export default function PhraseConstructor() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `phrase-${req.tonic}-${req.mode}.musicir.json`;
+    a.download = `phrase-${req.tonic}-${req.mode}-seed${e.seed}.musicir.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
@@ -259,7 +284,7 @@ export default function PhraseConstructor() {
       setLoadError([{ path: "voices", message: `the Phrase Constructor edits a document with a "${MELODY}" voice; this one has none` }]);
       return;
     }
-    // restore the controls that produced it, if the file says what they were
+    // restore the controls (including the seed and locks) that produced it, if the file says what they were
     const stored = doc.transformations.find((t) => t.op === "phrase-generate")?.params.request;
     if (typeof stored === "string") {
       try {
@@ -273,6 +298,7 @@ export default function PhraseConstructor() {
     setIr(doc);
     setCandidate(null);
     setCandidates([]);
+    setStats(null);
     setEdited(false);
     setLoaded({ name: file.name });
     setSelected(doc.semantics?.targets?.[0]?.note ?? null);
@@ -289,17 +315,16 @@ export default function PhraseConstructor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [tuningKey],
   );
-  const melody = useMemo(() => (ir ? ir.events.filter((e): e is IRNoteEvent => e.kind === "note" && e.voice === MELODY) : []), [ir]);
+  const melody = useMemo(() => (ir ? ir.events.filter((x): x is IRNoteEvent => x.kind === "note" && x.voice === MELODY) : []), [ir]);
   const toDisplay = useCallback(
-    (n: IRNoteEvent): DisplayNote | null =>
-      n.instrument && ir ? { string: n.instrument.string, fret: n.instrument.fret, role: roleOf(ir, n), label: n.pitch.name.replace(/-?\d+$/, ""), pitch: n.pitch.name } : null,
+    (n: IRNoteEvent): DisplayNote | null => (n.instrument && ir ? { string: n.instrument.string, fret: n.instrument.fret, role: roleOf(ir, n), label: n.pitch.name.replace(/-?\d+$/, ""), pitch: n.pitch.name } : null),
     [ir],
   );
   const shownIds = sounding.length ? sounding : selected ? [selected] : [];
   const fretNotes = melody.filter((n) => shownIds.includes(n.id)).map(toDisplay).filter((x): x is DisplayNote => x !== null);
   const fretGhost = melody.map(toDisplay).filter((x): x is DisplayNote => x !== null);
 
-  const sel = ir?.events.find((e): e is IRNoteEvent => e.kind === "note" && e.id === selected) ?? null;
+  const sel = ir?.events.find((x): x is IRNoteEvent => x.kind === "note" && x.id === selected) ?? null;
   const selFunctions = ir?.semantics?.noteFunctions?.find((f) => f.note === selected);
   const selGestures = ir?.semantics?.gestures?.filter((g) => selected && (g.notes.includes(selected) || ir.semantics?.targets?.some((t) => t.id === g.target && t.note === selected))) ?? [];
   const selReadings = analysis?.interpretations.filter((i) => selected && i.notes.includes(selected)) ?? [];
@@ -308,6 +333,9 @@ export default function PhraseConstructor() {
   const regLo = req.register[0];
   const regHi = req.register[1];
   const set = (patch: Partial<PhraseRequest>) => setReq((r) => ({ ...r, ...patch }));
+  const exploreAllDegrees = e.degrees === "all";
+  const naturalDegrees = targets.options.filter((o) => o.kind !== "alteration").map((o) => o.degree);
+  const activeDegrees = exploreAllDegrees ? naturalDegrees : (e.degrees as readonly string[]);
 
   return (
     <main className="lab lab2 ph">
@@ -317,7 +345,8 @@ export default function PhraseConstructor() {
             Phrase Constructor <span>phase 3</span>
           </h1>
           <p>
-            A ii–V–I phrase built from a grammar of targets, outlines, enclosures and rhythm, then inspected note by note. <a href="/">← Musical Lab</a> · <a href="/evaluator">Engine evaluator →</a>
+            Contrasting phrases built from a grammar of targets, outlines, enclosures, runs and rhythm; inspect them note by note, then develop the one you like. <a href="/">← Musical Lab</a> ·{" "}
+            <a href="/evaluator">Engine evaluator →</a>
           </p>
         </div>
         <div className="docbar">
@@ -325,7 +354,7 @@ export default function PhraseConstructor() {
             ⬇ Save MusicIR
           </button>
           <button onClick={() => fileRef.current?.click()}>⬆ Load MusicIR…</button>
-          <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(e) => void onFile(e.target.files?.[0])} data-testid="ph-file" />
+          <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(ev) => void onFile(ev.target.files?.[0])} data-testid="ph-file" />
         </div>
       </header>
 
@@ -342,13 +371,12 @@ export default function PhraseConstructor() {
         </div>
       )}
 
-      {/* ── 1-4: what to build ─────────────────────────────────────────── */}
       <section className="panel ph-controls" aria-label="Phrase request">
         <fieldset>
           <legend>1 · Harmony</legend>
           <label>
             Key
-            <select value={req.tonic} onChange={(e) => set({ tonic: e.target.value })}>
+            <select value={req.tonic} onChange={(ev) => set({ tonic: ev.target.value })}>
               {TONICS.map((t) => (
                 <option key={t}>{t}</option>
               ))}
@@ -356,137 +384,77 @@ export default function PhraseConstructor() {
           </label>
           <label>
             Mode
-            <select value={req.mode} onChange={(e) => set({ mode: e.target.value as "major" | "minor", targetDegree: "3" })}>
+            <select value={req.mode} onChange={(ev) => set({ mode: ev.target.value as "major" | "minor" })}>
               <option value="major">major ii–V–I</option>
               <option value="minor">minor ii–V–i</option>
             </select>
           </label>
           <label>
             Tempo <b>{req.bpm}</b>
-            <input type="range" min={50} max={200} value={req.bpm} onChange={(e) => set({ bpm: Number(e.target.value) })} />
+            <input type="range" min={50} max={200} value={req.bpm} onChange={(ev) => set({ bpm: Number(ev.target.value) })} />
           </label>
         </fieldset>
 
         <fieldset>
           <legend>2 · Target (on {targets.chord})</legend>
           <label>
-            Arrive on
-            <select value={req.targetDegree} onChange={(e) => set({ targetDegree: e.target.value })} data-testid="ph-target">
-              {targets.options.map((o) => (
-                <option key={o.degree} value={o.degree}>
-                  {o.degree} · {o.note} · {o.role}
-                  {o.kind === "alteration" ? " (alteration)" : o.kind === "extension" ? " (extension)" : ""}
-                </option>
-              ))}
+            Mode
+            <select value={e.mode} onChange={(ev) => setE({ mode: ev.target.value as "explore" | "focus" })} data-testid="ph-mode">
+              <option value="explore">Explore: every compatible target</option>
+              <option value="focus">Focus: lock one target</option>
             </select>
           </label>
+          {e.mode === "focus" ? (
+            <label>
+              Arrive on
+              <select value={e.focusDegree} onChange={(ev) => setE({ focusDegree: ev.target.value })} data-testid="ph-target">
+                {targets.options.map((o) => (
+                  <option key={o.degree} value={o.degree}>
+                    {o.degree} · {o.note} · {o.role}
+                    {o.kind === "alteration" ? " (alteration)" : o.kind === "extension" ? " (extension)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <div className="ph-degrees" data-testid="ph-degrees">
+              {targets.options.map((o) => (
+                <label key={o.degree} className="check" title={`${o.role}${o.kind === "chord-tone" ? "" : ` (${o.kind})`}`}>
+                  <input
+                    type="checkbox"
+                    checked={activeDegrees.includes(o.degree)}
+                    onChange={(ev) => {
+                      const next = ev.target.checked ? [...activeDegrees, o.degree] : activeDegrees.filter((d) => d !== o.degree);
+                      setE({ degrees: next.length === 0 ? "all" : next });
+                    }}
+                  />
+                  {o.note}
+                  <small>{o.degree}</small>
+                </label>
+              ))}
+            </div>
+          )}
+          <Dim label="Octave" value={e.bands} options={BAND_NAMES.map((b) => ({ id: b, name: `${b} register` }))} onChange={(v) => setE({ bands: v })} testid="ph-bands" />
         </fieldset>
 
         <fieldset>
-          <legend>3 · Melodic operations</legend>
-          <label>
-            Outline the V chord
-            <select
-              value={req.outline.direction}
-              onChange={(e) => set({ outline: { ...req.outline, direction: e.target.value as PhraseRequest["outline"]["direction"] } })}
-              data-testid="ph-outline"
-            >
-              <option value="any">arpeggio, any shape</option>
-              <option value="up">arpeggio up</option>
-              <option value="down">arpeggio down</option>
-              <option value="updown">arpeggio up then down</option>
-              <option value="mixed">arpeggio, mixed</option>
-              <option value="none">no outline</option>
-            </select>
-          </label>
-          <label>
-            Reach the target by
-            <select value={req.embellishment.kind} onChange={(e) => set({ embellishment: { ...req.embellishment, kind: e.target.value as PhraseRequest["embellishment"]["kind"] } })} data-testid="ph-emb">
-              <option value="enclosure">an enclosure (both sides)</option>
-              <option value="approach">an approach (one side)</option>
-              <option value="none">nothing: arrive directly</option>
-            </select>
-          </label>
-          <label>
-            Steps are
-            <select value={req.embellishment.step} onChange={(e) => set({ embellishment: { ...req.embellishment, step: e.target.value as PhraseRequest["embellishment"]["step"] } })}>
-              <option value="chromatic">chromatic (semitones)</option>
-              <option value="diatonic">diatonic (scale steps)</option>
-              <option value="mixed">mixed</option>
-              <option value="any">any</option>
-            </select>
-          </label>
-          <label>
-            From
-            <select value={req.embellishment.side ?? "any"} onChange={(e) => set({ embellishment: { ...req.embellishment, side: e.target.value as "above" | "below" | "any" } })}>
-              <option value="any">either side</option>
-              <option value="above">above first</option>
-              <option value="below">below first</option>
-            </select>
-          </label>
+          <legend>3 · Melody</legend>
+          <Dim label="Melodic strategy" value={e.strategies} options={STRATEGIES.map((s) => ({ id: s.id, name: s.name }))} onChange={(v) => setE({ strategies: v })} testid="ph-strategies" />
+          <Dim label="Contour" value={e.contours} options={CONTOUR_CHOICES.filter((c) => c !== "any").map((c) => ({ id: c, name: c }))} onChange={(v) => setE({ contours: v })} testid="ph-contours" />
+          <Dim label="Phrase length" value={e.lengths} options={LENGTHS.map((l) => ({ id: l, name: l === "short" ? "short (2 beats)" : l === "standard" ? "standard (1 bar)" : "long (1½ bars, two chords)" }))} onChange={(v) => setE({ lengths: v })} testid="ph-lengths" />
         </fieldset>
 
         <fieldset>
           <legend>4 · Rhythm</legend>
-          <label>
-            Feel
-            <select value={req.rhythm.feel ?? "any"} onChange={(e) => set({ rhythm: { ...req.rhythm, feel: e.target.value as "straight" | "triplet" | "any" } })}>
-              <option value="any">any</option>
-              <option value="straight">straight</option>
-              <option value="triplet">triplets</option>
-            </select>
-          </label>
-          <label>
-            Shape
-            <select value={req.rhythm.shape ?? "any"} onChange={(e) => set({ rhythm: { ...req.rhythm, shape: e.target.value as "even" | "accelerating" | "decelerating" | "any" } })}>
-              <option value="any">any</option>
-              <option value="accelerating">accelerating into the target</option>
-              <option value="decelerating">decelerating</option>
-              <option value="even">even</option>
-            </select>
-          </label>
-          <label>
-            Density
-            <select
-              value={req.rhythm.density ?? ""}
-              onChange={(e) => {
-                const { density: _d, ...rest } = req.rhythm;
-                void _d;
-                set({ rhythm: e.target.value ? { ...rest, density: Number(e.target.value) } : rest });
-              }}
-            >
-              <option value="">no preference</option>
-              <option value="1">sparse</option>
-              <option value="2">medium</option>
-              <option value="3">busy</option>
-            </select>
-          </label>
-          <label>
-            Syncopation
-            <select
-              value={req.rhythm.syncopation ?? ""}
-              onChange={(e) => {
-                const { syncopation: _s, ...rest } = req.rhythm;
-                void _s;
-                set({ rhythm: e.target.value ? { ...rest, syncopation: Number(e.target.value) } : rest });
-              }}
-            >
-              <option value="">no preference</option>
-              <option value="0.1">little</option>
-              <option value="0.4">some</option>
-              <option value="0.8">a lot</option>
-            </select>
-          </label>
-          <label className="check">
-            <input type="checkbox" checked={req.rhythm.rests !== false} onChange={(e) => set({ rhythm: { ...req.rhythm, rests: e.target.checked } })} /> allow rests
-          </label>
+          <Dim label="Rhythmic character" value={e.rhythms} options={RHYTHM_CHARACTERS.map((r) => ({ id: r.id, name: r.name }))} onChange={(v) => setE({ rhythms: v })} testid="ph-rhythms" />
+          <Dim label="Density" value={e.densities} options={DENSITIES.map((d) => ({ id: d, name: d }))} onChange={(v) => setE({ densities: v })} testid="ph-densities" />
         </fieldset>
 
         <fieldset>
           <legend>Constraints</legend>
           <label>
             Lowest note
-            <select value={regLo} onChange={(e) => set({ register: [Math.min(Number(e.target.value), regHi), regHi] })}>
+            <select value={regLo} onChange={(ev) => set({ register: [Math.min(Number(ev.target.value), regHi), regHi] })}>
               {REGISTER.map((m) => (
                 <option key={m} value={m}>
                   {midiName(m)}
@@ -496,7 +464,7 @@ export default function PhraseConstructor() {
           </label>
           <label>
             Highest note
-            <select value={regHi} onChange={(e) => set({ register: [regLo, Math.max(Number(e.target.value), regLo)] })}>
+            <select value={regHi} onChange={(ev) => set({ register: [regLo, Math.max(Number(ev.target.value), regLo)] })}>
               {REGISTER.map((m) => (
                 <option key={m} value={m}>
                   {midiName(m)}
@@ -506,49 +474,59 @@ export default function PhraseConstructor() {
           </label>
           <label>
             Largest leap <b>{req.maxLeap}</b> semitones
-            <input type="range" min={2} max={14} value={req.maxLeap} onChange={(e) => set({ maxLeap: Number(e.target.value) })} />
+            <input type="range" min={2} max={14} value={req.maxLeap} onChange={(ev) => set({ maxLeap: Number(ev.target.value) })} />
           </label>
           <label>
             Highest fret <b>{req.maxFret}</b>
-            <input type="range" min={5} max={22} value={req.maxFret} onChange={(e) => set({ maxFret: Number(e.target.value) })} />
-          </label>
-          <label>
-            Prefer
-            <select
-              value={req.soft.direction ?? ""}
-              onChange={(e) => {
-                const { direction: _d, ...rest } = req.soft;
-                void _d;
-                set({ soft: e.target.value ? { ...rest, direction: e.target.value as "ascending" | "descending" | "arch" } : rest });
-              }}
-            >
-              <option value="">no direction preference</option>
-              <option value="ascending">ascending</option>
-              <option value="descending">descending</option>
-              <option value="arch">an arch (climax inside)</option>
-            </select>
+            <input type="range" min={5} max={22} value={req.maxFret} onChange={(ev) => set({ maxFret: Number(ev.target.value) })} />
           </label>
         </fieldset>
 
         <fieldset>
           <legend>Results</legend>
           <label>
-            How many candidates
-            <select value={req.candidates} onChange={(e) => set({ candidates: Number(e.target.value) })} data-testid="ph-count">
-              {[5, 8, 12, 20, 30, 40].map((n) => (
+            Contrasting phrases (at most)
+            <select value={e.count} onChange={(ev) => setE({ count: Number(ev.target.value) })} data-testid="ph-count">
+              {COUNTS.map((n) => (
                 <option key={n} value={n}>
                   {n}
                 </option>
               ))}
             </select>
           </label>
+          <label>
+            Seed
+            <input type="number" min={0} value={e.seed} onChange={(ev) => setE({ seed: Math.max(0, Math.floor(Number(ev.target.value) || 0)) })} data-testid="ph-seed" />
+          </label>
         </fieldset>
+
+        {e.locks && Object.keys(e.locks).length > 0 && (
+          <div className="ph-active-locks" data-testid="ph-active-locks">
+            <b>Locked from the phrase you developed:</b>{" "}
+            {[
+              e.locks.targetPitch !== undefined ? `target pitch ${midiName(e.locks.targetPitch)}` : null,
+              e.locks.rhythmPlan ? "rhythm (every onset and length)" : null,
+              e.locks.contourShape !== undefined ? `contour shape ${e.locks.contourShape || "(none)"}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+            . Every exploration keeps these until you clear them.{" "}
+            <button onClick={() => setE({ locks: undefined })} data-testid="ph-clear-locks">
+              Clear locks
+            </button>
+          </div>
+        )}
 
         <div className="ph-go">
           <button className="play" onClick={generate} disabled={busy} data-testid="ph-generate">
-            {busy ? "Generating…" : "Generate candidates"}
+            {busy ? "Exploring…" : e.mode === "explore" ? "Explore" : "Generate"}
           </button>
-          <span className="muted">Hard constraints must hold; preferences only rank. The engine is deterministic: the same request gives the same candidates.</span>
+          <button onClick={newSeed} disabled={busy || candidates.length === 0} data-testid="ph-newseed">
+            Another set (next seed)
+          </button>
+          <span className="muted">
+            Same settings and seed always give the same phrases. A dimension set to “explore all” is varied across its values; pick one to lock it. Fewer phrases are returned rather than near-duplicates.
+          </span>
         </div>
       </section>
 
@@ -557,23 +535,41 @@ export default function PhraseConstructor() {
           {failure}
         </div>
       )}
-      {transformNote && <p className="panel ph-note" data-testid="ph-transform-note">{transformNote}</p>}
+      {note && (
+        <p className="panel ph-note" data-testid="ph-transform-note">
+          {note}
+        </p>
+      )}
 
-      {/* ── 5-6: candidates, listen and compare ────────────────────────── */}
-      {candidates.length > 0 && (
+      {candidates.length > 0 && stats && (
         <section className="panel" aria-label="Candidates">
           <h2>
-            Candidates <small>{considered} combinations considered · ranked by transparent heuristics, not by beauty</small>
+            {candidates.length} contrasting phrase{candidates.length === 1 ? "" : "s"} <small>seed {stats.seed}</small>
           </h2>
+          <p className="muted ph-stats" data-testid="ph-stats">
+            {stats.intentionsTried} intentions tried, {stats.intentionsReachable} reachable → {stats.poolSize} phrases, all verified ({stats.rejectedInvalid} rejected) → {stats.exactDuplicates} exact and {stats.nearDuplicates} near duplicates removed → {stats.selected} kept. Closest pair: distance{" "}
+            {stats.minDistance} (a near duplicate is below {stats.threshold}); on average {stats.meanDistance}. Covers {stats.coverage.targets} target degrees, {stats.coverage.registers} registers, {stats.coverage.strategies} strategy families, {stats.coverage.rhythms} rhythmic characters, {stats.coverage.contours} contours.
+          </p>
+          {stats.note && (
+            <p className="ph-note" data-testid="ph-fewer">
+              {stats.note}
+            </p>
+          )}
           <ol className="ph-cands" data-testid="ph-candidates">
             {candidates.map((c, i) => (
               <li key={`${c.id}-${i}`} className={candidate === c ? "active" : ""}>
                 <div className="ph-cand-head">
                   <b>#{i + 1}</b>
-                  <span className="ph-score" title="weighted mean of the named parts below">
+                  <span className="ph-score" title="adherence to the stated heuristics, not beauty">
                     {c.score.total.toFixed(2)}
                   </span>
-                  <span className="ph-summary">{c.summary}</span>
+                  <span className="ph-chips">
+                    {c.chips.map((chip) => (
+                      <span key={chip} className="ph-chip">
+                        {chip}
+                      </span>
+                    ))}
+                  </span>
                   <button
                     onClick={() => {
                       adopt(c, req);
@@ -585,8 +581,10 @@ export default function PhraseConstructor() {
                   <button onClick={() => adopt(c, req)} disabled={candidate === c}>
                     {candidate === c ? "Selected" : "Select"}
                   </button>
-                  <button onClick={() => setOpenScore(openScore === `${i}` ? null : `${i}`)}>why this score</button>
+                  <button onClick={() => setOpenScore(openScore === `${i}` ? null : `${i}`)}>details</button>
                 </div>
+                <div className="ph-how">{c.summary}</div>
+                {c.distinguishing.length > 0 && <div className="ph-distinct">{c.distinguishing.join(" · ")}</div>}
                 {openScore === `${i}` && (
                   <table className="ph-score-table">
                     <tbody>
@@ -612,11 +610,30 @@ export default function PhraseConstructor() {
         </section>
       )}
 
+      {candidate && !edited && !loaded && (
+        <section className="panel ph-develop" aria-label="Develop the selected phrase" data-testid="ph-develop">
+          <h2>
+            Develop phrase {candidate.id.replace("phrase-", "#")} <small>lock what you like, vary the rest</small>
+          </h2>
+          <div className="ph-locks">
+            {LOCKS.map((l) => (
+              <label key={l.aspect} className="check" title={l.hint}>
+                <input type="checkbox" checked={locks.includes(l.aspect)} onChange={(ev) => setLocks((cur) => (ev.target.checked ? [...cur, l.aspect] : cur.filter((a) => a !== l.aspect)))} data-testid={`ph-lock-${l.aspect}`} />
+                keep {l.label}
+              </label>
+            ))}
+            <button className="play" onClick={develop} disabled={busy} data-testid="ph-develop-go">
+              Develop variations
+            </button>
+          </div>
+        </section>
+      )}
+
       {ir && schedule && (
         <>
           {loaded && (
             <div className="panel loaded-note" data-testid="ph-loaded">
-              Showing <b>{loaded.name}</b>. You can inspect, analyse and edit its notes. Regenerating comes from the controls above.
+              Showing <b>{loaded.name}</b>. You can inspect, analyse and edit its notes. Exploring again uses the controls above.
             </div>
           )}
 
@@ -632,7 +649,7 @@ export default function PhraseConstructor() {
             </span>
             <label className="zoom">
               Zoom
-              <input type="range" min={40} max={300} value={pxPerSecond} onChange={(e) => setPxPerSecond(Number(e.target.value))} />
+              <input type="range" min={40} max={300} value={pxPerSecond} onChange={(ev) => setPxPerSecond(Number(ev.target.value))} />
             </label>
           </section>
 
@@ -641,19 +658,9 @@ export default function PhraseConstructor() {
               Rhythm and harmony <small>click a note to inspect it; click the background to move the playhead</small>
             </h2>
             <div className="ph-legend">
-              <i className="ph-note ph-target" /> target arrival <i className="ph-note ph-outline" /> chord outline <i className="ph-note ph-embellish" /> approach / enclosure <i className="ph-note ph-bass" /> bass root
+              <i className="ph-note ph-target" /> target arrival <i className="ph-note ph-outline" /> chord outline <i className="ph-note ph-embellish" /> approach / enclosure / run <i className="ph-note ph-bass" /> bass root
             </div>
-            <PhraseRoll
-              ir={ir}
-              schedule={schedule}
-              pxPerSecond={pxPerSecond}
-              selected={selected}
-              melodyVoice={MELODY}
-              playheadRef={playheadRef}
-              scrollRef={scrollRef}
-              onSelect={setSelected}
-              onSeek={(f) => playerRef.current?.seek(f)}
-            />
+            <PhraseRoll ir={ir} schedule={schedule} pxPerSecond={pxPerSecond} selected={selected} melodyVoice={MELODY} playheadRef={playheadRef} scrollRef={scrollRef} onSelect={setSelected} onSeek={(f) => playerRef.current?.seek(f)} />
           </section>
 
           <section className="panel">
@@ -663,7 +670,6 @@ export default function PhraseConstructor() {
             <Fretboard board={board} frets={Math.min(22, Math.max(req.maxFret + 2, 12))} notes={fretNotes} ghost={fretGhost.filter((g) => !fretNotes.some((n) => n.string === g.string && n.fret === g.fret))} showScale={false} />
           </section>
 
-          {/* ── 7-8: inspect and change ──────────────────────────────────── */}
           <div className="ph-two">
             <section className="panel ph-inspect" aria-label="Note inspector" data-testid="ph-inspector">
               <h2>Inspect a note</h2>
@@ -706,10 +712,14 @@ export default function PhraseConstructor() {
                     <ul className="ph-steps">
                       {selReadings.map((r) => (
                         <li key={r.id}>
-                          <b>{r.kind}</b> <span className="muted">confidence {r.confidence.toFixed(2)}{r.alternatives.length ? ` · rivals: ${r.alternatives.join(", ")}` : ""}</span>
+                          <b>{r.kind}</b>{" "}
+                          <span className="muted">
+                            confidence {r.confidence.toFixed(2)}
+                            {r.alternatives.length ? ` · rivals: ${r.alternatives.join(", ")}` : ""}
+                          </span>
                           <ul>
-                            {r.evidence.map((e, k) => (
-                              <li key={k}>{e}</li>
+                            {r.evidence.map((x, k) => (
+                              <li key={k}>{x}</li>
                             ))}
                           </ul>
                         </li>
@@ -724,7 +734,7 @@ export default function PhraseConstructor() {
                     <button onClick={() => edit({ midi: sel.pitch.midi + 12 })}>+8ve</button>
                     <label>
                       length
-                      <select value={fstr(parseFraction(sel.duration))} onChange={(e) => edit({ duration: e.target.value })}>
+                      <select value={fstr(parseFraction(sel.duration))} onChange={(ev) => edit({ duration: ev.target.value })}>
                         {[...new Set([fstr(parseFraction(sel.duration)), ...DURATIONS])].map((d) => (
                           <option key={d}>{d}</option>
                         ))}
@@ -747,36 +757,31 @@ export default function PhraseConstructor() {
               )}
             </section>
 
-            <section className="panel" aria-label="Construction and transformations">
+            <section className="panel" aria-label="Construction">
               <h2>Construction</h2>
               <ol className="ph-steps" data-testid="ph-construction">
                 {(ir.semantics?.gestures ?? []).map((g) => (
                   <li key={g.id}>
-                    <b>{g.kind}</b> <span className="muted">· {g.provenance.status} · notes {g.notes.join(" ")}</span>
+                    <b>{g.kind}</b>{" "}
+                    <span className="muted">
+                      · {g.provenance.status} · notes {g.notes.join(" ")}
+                    </span>
                     <div>{g.steps.map(describeStep).join(" → ")}</div>
                   </li>
                 ))}
               </ol>
-              <h3>Transform while holding part fixed</h3>
-              <div className="ph-edit">
-                <button onClick={keepRhythm} disabled={busy || !candidate || edited} data-testid="ph-keep-rhythm">
-                  Keep the rhythm, new pitches
-                </button>
-                <button onClick={keepPitches} disabled={busy || !candidate || edited} data-testid="ph-keep-pitches">
-                  Keep the pitches, new rhythm
-                </button>
-              </div>
-              <p className="muted">
-                {edited ? "This phrase has been edited by hand, so its construction is history, not a promise; generate again to transform." : !candidate ? "Generate or select a candidate to transform it." : "The second one uses the rhythm settings above (try “accelerating”)."}
-              </p>
+              {edited && <p className="muted">This phrase has been edited by hand, so its construction is history, not a promise; explore again to develop a phrase.</p>}
               <h3>Analysis</h3>
               <label className="check">
-                <input type="checkbox" checked={attachAnalysis} onChange={(e) => setAttachAnalysis(e.target.checked)} /> save the analysis with the document
+                <input type="checkbox" checked={attachAnalysis} onChange={(ev) => setAttachAnalysis(ev.target.checked)} /> save the analysis with the document
               </label>
               <ul className="ph-steps" data-testid="ph-analysis">
                 {(analysis?.interpretations ?? []).map((r) => (
                   <li key={r.id}>
-                    <b>{r.kind}</b> <span className="muted">{r.confidence.toFixed(2)} · {r.notes.join(" ")}</span>
+                    <b>{r.kind}</b>{" "}
+                    <span className="muted">
+                      {r.confidence.toFixed(2)} · {r.notes.join(" ")}
+                    </span>
                   </li>
                 ))}
               </ul>

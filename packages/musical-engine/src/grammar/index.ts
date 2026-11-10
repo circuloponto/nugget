@@ -10,3 +10,4 @@ export * from "./analysis";
 export * from "./counterpoint";
 export * from "./structure";
 export * from "./request";
+export * from "./explore";

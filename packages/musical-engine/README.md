@@ -14,7 +14,7 @@ Layers (`instrument` → `theory`; `ir` reads both; `time` and `audio` stand alo
 | `src/audio/` | plucked-string synthesis as pure `Float32Array` functions | Web Audio, any player |
 
 ```
-npm test               # 669 tests
+npm test               # 715 tests
 npm run build          # ESM + CJS + .d.ts into dist/
 ```
 
@@ -216,6 +216,21 @@ judge the pitches (chord tones on strong beats, approach notes lighter than the 
 `phraseSpecFromRequest` / `parsePhraseRequest` / `targetOptions` keep the UI free of music logic; a request stored in a saved
 file is treated as untrusted.
 
+### Exploration: `explorePhrases(GenerationSpace)`
+
+`generatePhrase` answers "the best few ways to reach this target". Asked for more, it repeats itself (one target, one
+embellishment, scores within 0.015), so the Constructor uses **exploration**, which returns a few *contrasting* phrases:
+
+- a `GenerationSpace` of independent dimensions: target (Explore every chord tone and natural extension, or Focus on one degree), octave band, melodic and harmonic strategy (11, all grammar compositions), contour, rhythmic character, density, phrase length. Locking a dimension is giving it one value;
+- a seeded, balanced sampler visits cells of that space (the seed picks which intentions are visited, never what a phrase is);
+- each intention is realised by `generatePhrase`; the rhythmic character is a hard requirement on the rhythm plan, so rhythm is part of the intention;
+- every candidate is verified (valid MusicIR, hard constraints re-measured) **before** ranking;
+- selection is by `phraseDistance` over target, register, structure, contour, rhythm and pitch material: exact duplicates and near duplicates (distance under 0.22) are dropped, the rest chosen greedily for coverage; **fewer are returned rather than padded**;
+- `lockAspects` / `developRequest` hold a chosen phrase's target, register, strategy, exact rhythm, exact contour, density or length fixed, to develop variations of it.
+
+`measureDiversity` reports the closest and mean pairwise distance and the coverage of each dimension. The full report, with the original
+convergence measurements, is in `docs/phase3-generation-diversity.md`.
+
 ### The semantic layer of MusicIR
 
 An **optional** `semantics` section (`targets`, `noteFunctions`, `gestures` with their construction `steps`, `motifs`,
@@ -261,7 +276,7 @@ every hand. The Lab and the exported MusicIR both say so.
 - Motif development (`motif.ts`: sequence, inversion, retrograde, augmentation, fragmentation, displacement, fitting a motif to a target) is a tested library, not yet driven by the generator or the UI.
 - Counterpoint and phrase structure only *calculate and describe* (motion, consonance, exchange, imitation, climax, tension, relations proposed with evidence). They state facts and proposals, not rules or verdicts; the tension curve is a labelled heuristic.
 - Analysis works on a single melodic voice against chord segments; it does not yet infer harmony from the notes.
-- Generation runs on the main thread (about half a second for the default request); the UI shows a busy state.
+- Exploration runs on the main thread (about a second for the default request); the UI shows a busy state.
 - Pitch is spelled 12-TET throughout (`Pitch`/`Note`); the semantic layer does not itself assume equal temperament, but nothing else is implemented.
 - 12-TET only. Audio is a plucked-string model, not a sampled guitar.
 - No capo, no muted-string voicings, no barre geometry beyond finger counting.

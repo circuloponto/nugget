@@ -218,3 +218,15 @@ tbody tr.sel { background: var(--brass-glow); font-weight: 600; }
 .ph-steps li { margin-bottom: 6px; }
 .ph-edit { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
 .ph h3 { font-size: 14px; margin: 12px 0 4px; color: var(--ink-soft); }
+
+/* ── Phase 3: exploration ──────────────────────────────────────────────── */
+.ph-chips { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 320px; }
+.ph-chip { background: var(--stone-lighter); border-radius: 10px; padding: 1px 8px; font-size: 12px; color: var(--ink-soft); }
+.ph-chips .ph-chip:first-child { background: var(--brass-glow); color: var(--ink); font-weight: 600; }
+.ph-how { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+.ph-distinct { font-size: 12px; color: var(--approach); margin-top: 2px; }
+.ph-stats { font-size: 13px; }
+.ph-degrees { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.ph-degrees small { color: var(--stone); margin-left: 2px; }
+.ph-locks { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.ph-active-locks { grid-column: 1 / -1; background: var(--brass-glow); border: 1px solid var(--brass); border-radius: 8px; padding: 8px 12px; font-size: 14px; }

@@ -11,10 +11,10 @@
  *
  * An interpretation is a claim and is only checked for well-formedness and references.
  */
-import { formatNote, parseNote, pitchClass, type Note } from "../theory/pitch";
+import { formatNote, parseNote, parsePitch, pitchClass, type Note } from "../theory/pitch";
 import { fadd, fcmp, parseFraction } from "../time/rational";
 import type { IRChordSegment, IRIssue, IRNoteEvent, MusicIR } from "../ir/types";
-import { chordFromSegment, degreeOf, EXTENSIONS, hasDegree } from "./chords";
+import { chordFromSegment, classifyPitch, degreeOf, EXTENSIONS, hasDegree } from "./chords";
 
 const ROLE_BY_TONE = ["root", "third", "fifth", "seventh"];
 
@@ -148,7 +148,11 @@ function verifyChecked(ir: MusicIR): IRIssue[] {
     if (g.kind === "arpeggiation") {
       ns.forEach((n, k) => {
         const seg = segAt(ir, parseFraction(n.onset));
-        if (seg && !seg.tones.some((t) => tryNote(t) && pitchClass(tryNote(t)!) === ((n.pitch.midi % 12) + 12) % 12)) {
+        const chord = seg ? chordFromSegment(seg) : null;
+        const isTone = seg?.tones.some((t) => tryNote(t) && pitchClass(tryNote(t)!) === ((n.pitch.midi % 12) + 12) % 12) ?? true;
+        // an outline may also use the chord's own extensions (the 9th of G7), spelled as the chord spells them
+        const isTension = chord ? classifyPitch(chord, parsePitch(n.pitch.name)) !== null : false;
+        if (seg && !isTone && !isTension) {
           bad(`${p}.notes[${k}]`, `${n.pitch.name} is not a tone of ${seg.symbol}, so this is not an outline of it`);
         }
       });
@@ -158,6 +162,13 @@ function verifyChecked(ir: MusicIR): IRIssue[] {
       const near = d.filter((x) => Math.abs(x) >= 1 && Math.abs(x) <= 2);
       if (!(near.some((x) => x > 0) && near.some((x) => x < 0))) bad(p, `an enclosure needs a note one or two semitones above AND below its target ${tNote.pitch.name}; got ${ns.map((n) => n.pitch.name).join(", ")}`);
       if (ns.some((n) => fcmp(parseFraction(n.onset), parseFraction(tNote.onset)) >= 0)) bad(p, "an enclosure's notes must come before the target");
+    }
+    if (g.kind === "scalar-run" && tNote && ns.length > 0) {
+      const line = [...ns.map((n) => n.pitch.midi), tNote.pitch.midi];
+      const moves = line.slice(1).map((m, i) => m - line[i]!);
+      const dir = Math.sign(moves[0]!);
+      if (!moves.every((d) => Math.sign(d) === dir && Math.abs(d) >= 1 && Math.abs(d) <= 3)) bad(p, "a scale run must move by steps, in one direction, into its target");
+      if (fcmp(parseFraction(ns[ns.length - 1]!.onset), parseFraction(tNote.onset)) >= 0) bad(p, "a scale run's notes must come before the target");
     }
     if (g.kind === "approach" && tNote && ns.length > 0) {
       const last = ns[ns.length - 1]!;
