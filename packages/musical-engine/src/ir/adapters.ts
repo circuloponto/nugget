@@ -9,7 +9,7 @@ import { type Scale } from "../theory/scale";
 import { type CyclePlan } from "../instrument/voiceLeading";
 import { type GuitarVoicing } from "../instrument/realize";
 import { type PlayabilityConstraints } from "../instrument/playability";
-import { type Tuning } from "../instrument/fretboard";
+import { STANDARD_TUNING, type Tuning } from "../instrument/fretboard";
 import { type TriadVoicing } from "../theory/voicing";
 import { fadd, fmul, frac, fstr, parseFraction, ZERO, type Fraction } from "../time/rational";
 import {
@@ -70,6 +70,14 @@ function chordAndNotes(
     root: formatNote(t.root),
     tones: t.notes.map(formatNote),
     inversion: voicing.inversion,
+    voicing: voicing.pitches.map((p, v) => {
+      const spot = step.guitar?.notes[v];
+      return {
+        voice: `v${v + 1}`,
+        pitch: { name: formatPitch(p), midi: midi(p) },
+        ...(spot ? { instrument: { string: spot.string, fret: spot.fret } } : {}),
+      };
+    }),
     ...(scale ? { key: { tonic: formatNote(scale.tonic), scale: scale.type } } : {}),
     provenance: { status: "generated" },
   };
@@ -111,7 +119,7 @@ export function triadVoicingToIR(voicing: TriadVoicing, options: TriadIROptions 
     version: MUSIC_IR_VERSION,
     id,
     ...(tempo ? { tempo: tempoToIR(tempo) } : {}),
-    voices: voicesFor(voicing.pitches.length, tuning && guitar ? tuning.strings.map(formatPitch) : undefined),
+    voices: voicesFor(voicing.pitches.length, guitar ? (tuning ?? STANDARD_TUNING).strings.map(formatPitch) : undefined),
     events: notes,
     chords: [chord],
     relations: [],
@@ -127,6 +135,11 @@ export interface CycleIROptions {
   tempo?: IRTempoInput;
   /** Guitar limits to record as a constraint (only when steps carry guitar positions). */
   constraints?: PlayabilityConstraints;
+  /**
+   * The tuning the guitar positions were realized in. Positions are always recorded with a
+   * stated tuning so they can be verified; standard tuning is assumed when this is omitted,
+   * and the validator will flag the document if the frets do not actually fit it.
+   */
   tuning?: Tuning;
   /** The last chord leads back into the first (a closed loop). */
   loop?: boolean;
@@ -177,7 +190,7 @@ export function cycleToIR(scale: Scale, cycleId: number, steps: readonly IRStep[
     id,
     title: `${formatNote(scale.tonic)} ${scale.type}: cycle ${cycleId}`,
     ...(tempo ? { tempo: tempoToIR(tempo) } : {}),
-    voices: voicesFor(voiceCount, hasGuitar && tuning ? tuning.strings.map(formatPitch) : undefined),
+    voices: voicesFor(voiceCount, hasGuitar ? (tuning ?? STANDARD_TUNING).strings.map(formatPitch) : undefined),
     events,
     chords,
     relations,
@@ -195,7 +208,7 @@ export function cycleToIR(scale: Scale, cycleId: number, steps: readonly IRStep[
                 allowOpenStrings: constraints.allowOpenStrings,
                 requireContiguousStrings: constraints.requireContiguousStrings,
                 requireAscendingStrings: constraints.requireAscendingStrings,
-                ...(tuning ? { tuning: tuning.strings.map(formatPitch) } : {}),
+                tuning: (tuning ?? STANDARD_TUNING).strings.map(formatPitch),
               },
               note: "Approximation: checks string order, fret stretch, pitch accuracy and an estimated finger count. Valid under these limits is not a guarantee of ergonomic playability.",
             },

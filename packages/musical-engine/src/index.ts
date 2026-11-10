@@ -31,8 +31,16 @@ export * from "./time/rhythm";
 // ── MusicIR v1 ────────────────────────────────────────────────────────────
 export * from "./ir/types";
 export * from "./ir/validate";
+export * from "./ir/semantic";
 export * from "./ir/adapters";
 export * from "./ir/schedule";
 
 // ── audio synthesis (pure, no Web Audio) ──────────────────────────────────
 export * from "./audio/pluck";
+export * from "./time/steps";
+export * from "./ir/rhythmize";
+export * from "./ir/frames";
+export * from "./ir/playback";
+export * from "./ir/progression";
+export * from "./audio/render";
+export * from "./ir/view";

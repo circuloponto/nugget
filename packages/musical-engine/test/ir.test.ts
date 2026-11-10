@@ -172,7 +172,7 @@ describe("exact time inside the document", () => {
       id: `t${i}`,
       kind: "note" as const,
       voice: "v1",
-      pitch: { name: "C4", midi: 60 },
+      pitch: { name: "C3", midi: 48 }, roles: { harmonic: "root" },
       onset: fstr(frac(i, 12)),
       duration: fstr(third),
     }));

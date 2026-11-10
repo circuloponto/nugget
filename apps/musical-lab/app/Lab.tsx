@@ -15,6 +15,7 @@ import {
   isSameNote,
   LETTERS,
   makeFretboard,
+  PLUCK_TONES,
   planCycleOnGuitar,
   planPerfectCycleLoop,
   SCALE_TYPES,
@@ -31,7 +32,7 @@ import {
   type Pitch,
   type ScaleType,
 } from "@musical-lab/engine";
-import { ensureAudio, playChord, type PluckTone } from "./audio";
+import { ensureAudio, playChord, type PluckOptions, type PluckTone } from "./audio";
 import Fretboard, { type DisplayNote, type Role } from "./Fretboard";
 
 const TONICS = LETTERS.flatMap((l) => [l, `${l}b`, `${l}#`]);
@@ -42,6 +43,20 @@ const SCALE_LABEL: Record<ScaleType, string> = {
 };
 
 type FoldPolicy = "sweep" | "whole-voicing" | "none";
+
+/** The four dials of the Sine sound, starting at the engine's own preset. */
+interface Shape {
+  ringSeconds: number;
+  attackSeconds: number;
+  brightness: number;
+  lowEnd: number;
+}
+const SINE_SHAPE: Shape = {
+  ringSeconds: PLUCK_TONES.sine.ringSeconds,
+  attackSeconds: PLUCK_TONES.sine.attackSeconds,
+  brightness: PLUCK_TONES.sine.brightness,
+  lowEnd: PLUCK_TONES.sine.lowEnd,
+};
 
 /** Facts about a perfect loop, shown to the user. */
 interface LoopInfo {
@@ -94,7 +109,8 @@ export default function Lab() {
   const [loop, setLoop] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [sound, setSound] = useState(true);
-  const [tone, setTone] = useState<PluckTone>("mellow");
+  const [tone, setTone] = useState<PluckTone>("sine");
+  const [shape, setShape] = useState<Shape>(SINE_SHAPE);
   const [bpm, setBpm] = useState(72);
   const [heard, setHeard] = useState("");
   const [step, setStep] = useState(0);
@@ -191,7 +207,7 @@ export default function Lab() {
   /** Strum a chord (the notes' MIDI numbers, bass first) if sound is on. */
   const hear = (f: Frame | undefined) => {
     if (!sound || !f) return;
-    if (playChord(f.guitar.map((n) => n.midi), tone)) setHeard(f.pitches.map(formatPitch).join("  "));
+    if (playChord(f.guitar.map((n) => n.midi), tone, tone === "sine" ? shape : undefined)) setHeard(f.pitches.map(formatPitch).join("  "));
   };
 
   /** Jump to a chord and let it sound. */
@@ -353,12 +369,14 @@ export default function Lab() {
             onChange={(e) => {
               setTone(e.target.value as PluckTone);
               // let the new tone be heard right away, with the chord on screen
-              if (sound && frame) playChord(frame.guitar.map((n) => n.midi), e.target.value as PluckTone);
+              const next = e.target.value as PluckTone;
+              if (sound && frame) playChord(frame.guitar.map((n) => n.midi), next, next === "sine" ? shape : undefined);
             }}
           >
-            <option value="soft">Soft (round, short)</option>
-            <option value="mellow">Mellow (default)</option>
-            <option value="bright">Bright (the original)</option>
+            <option value="sine">Sine (almost a plucked sine wave)</option>
+            <option value="soft">Soft string (round, short)</option>
+            <option value="mellow">Mellow string</option>
+            <option value="bright">Bright string (the original)</option>
           </select>
         </label>
         {mode === "cycle" && (
@@ -367,6 +385,42 @@ export default function Lab() {
           </label>
         )}
       </section>
+
+      {tone === "sine" && (
+        <section className="panel shaping" aria-label="Shape the sine sound">
+          <h2>Shape the sound <small>move a slider and the current chord replays</small></h2>
+          <div className="sliders">
+            {(
+              [
+                { key: "ringSeconds", label: "Ring (resonance)", hint: "seconds to fade out; lower = shorter", min: 0.3, max: 3, step: 0.05, show: (v: number) => `${v.toFixed(2)} s` },
+                { key: "attackSeconds", label: "Attack (pluck)", hint: "fade-in; higher = softer start", min: 0.002, max: 0.04, step: 0.001, show: (v: number) => `${Math.round(v * 1000)} ms` },
+                { key: "brightness", label: "Brightness", hint: "upper partials; 0 = pure sine", min: 0, max: 0.6, step: 0.01, show: (v: number) => v.toFixed(2) },
+                { key: "lowEnd", label: "Low-end definition", hint: "clearer low notes; 0 = off", min: 0, max: 1, step: 0.05, show: (v: number) => v.toFixed(2) },
+              ] as const
+            ).map((d) => (
+              <label key={d.key} className="slider-row">
+                <span>
+                  {d.label} <b>{d.show(shape[d.key])}</b>
+                </span>
+                <input
+                  type="range"
+                  min={d.min}
+                  max={d.max}
+                  step={d.step}
+                  value={shape[d.key]}
+                  onChange={(e) => {
+                    const next: Shape = { ...shape, [d.key]: Number(e.target.value) };
+                    setShape(next);
+                    if (sound && frame) playChord(frame.guitar.map((n) => n.midi), "sine", next as PluckOptions);
+                  }}
+                />
+                <em>{d.hint}</em>
+              </label>
+            ))}
+          </div>
+          <button className="export" onClick={() => setShape(SINE_SHAPE)}>Reset to default</button>
+        </section>
+      )}
 
       <section className="panel scale-line">
         <strong>{formatNote(scale.tonic)} {SCALE_LABEL[scale.type].toLowerCase()}:</strong>{" "}

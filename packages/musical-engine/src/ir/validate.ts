@@ -6,6 +6,7 @@
 import { MusicTheoryError } from "../errors";
 import { midi, parsePitch } from "../theory/pitch";
 import { fadd, fcmp, flt, parseFraction, type Fraction } from "../time/rational";
+import { verifyMusicIRSemantics } from "./semantic";
 import { MUSIC_IR_VERSION, type IREvent, type IRIssue, type MusicIR } from "./types";
 
 type Obj = Record<string, unknown>;
@@ -143,6 +144,28 @@ export function validateMusicIR(input: unknown): IRIssue[] {
     if (!dur || dur.num <= 0) bad(`${p}.duration`, "must be a positive exact fraction string");
     if (!isStr(c.symbol)) bad(`${p}.symbol`, "needs a chord symbol");
     if (!Array.isArray(c.tones) || c.tones.length === 0 || !c.tones.every(isStr)) bad(`${p}.tones`, "needs spelled chord tones");
+    if (c.voicing !== undefined) {
+      if (!Array.isArray(c.voicing)) bad(`${p}.voicing`, "must be an array");
+      else {
+        c.voicing.forEach((vn: unknown, k: number) => {
+          const q = `${p}.voicing[${k}]`;
+          if (!isObj(vn) || !isStr(vn.voice) || !voiceIds.has(vn.voice)) return bad(q, `unknown voice ${JSON.stringify(isObj(vn) ? vn.voice : vn)}`);
+          const pitch = vn.pitch;
+          if (!isObj(pitch) || !isStr(pitch.name) || typeof pitch.midi !== "number") return bad(`${q}.pitch`, "needs { name, midi }");
+          try {
+            if (midi(parsePitch(pitch.name)) !== pitch.midi) bad(`${q}.pitch`, `"${pitch.name}" does not match midi ${pitch.midi}`);
+          } catch {
+            bad(`${q}.pitch.name`, "unparseable pitch name");
+          }
+          if (vn.instrument !== undefined) {
+            const ins = vn.instrument;
+            if (!isObj(ins) || !Number.isInteger(ins.string) || !Number.isInteger(ins.fret) || (ins.fret as number) < 0) {
+              bad(`${q}.instrument`, "needs integer { string, fret ≥ 0 }");
+            }
+          }
+        });
+      }
+    }
     if (onset && dur) {
       if (prevEnd && flt(onset, prevEnd)) bad(p, "chord segments must be sorted and must not overlap");
       prevEnd = fadd(onset, dur);
@@ -192,6 +215,9 @@ export function validateMusicIR(input: unknown): IRIssue[] {
     const unit = isObj(m) ? tryFraction(m.unit) : null;
     if (!unit || unit.num <= 0) bad("meter.unit", "must be a positive exact fraction string");
   }
+  // Semantic checks read several fields together, so they only make sense on a well-formed
+  // document. (verifyMusicIRSemantics can also be called on its own.)
+  if (issues.length === 0) issues.push(...verifyMusicIRSemantics(input as unknown as MusicIR));
   return issues;
 }
 

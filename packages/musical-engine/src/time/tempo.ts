@@ -3,7 +3,7 @@
  * produced only here, for playback.
  */
 import { MusicTheoryError } from "../errors";
-import { fdiv, fmul, frac, fnum, type Fraction } from "./rational";
+import { fadd, fdiv, ffloor, fmul, frac, fnum, type Fraction } from "./rational";
 
 const QUARTER: Fraction = frac(1, 4);
 
@@ -12,6 +12,21 @@ export function toSeconds(position: Fraction, bpm: number, beat: Fraction = QUAR
   if (!(bpm > 0) || !Number.isFinite(bpm)) throw new MusicTheoryError("bpm must be a positive number");
   if (beat.num <= 0) throw new MusicTheoryError("beat must be a positive duration");
   return (fnum(position) / fnum(beat)) * (60 / bpm);
+}
+
+/**
+ * The audio sample frame at which a symbolic position falls, computed entirely in exact
+ * rational arithmetic and rounded ONCE at the end. Because nothing is accumulated in
+ * floating point, position n·(1/4) at 120 BPM and 44.1 kHz is exactly frame n·22050 however
+ * large n gets, and three triplets in a beat land on exact thirds. `bpm` is the tempo in
+ * beats (of `beat`) per minute, as an exact fraction.
+ */
+export function toSampleFrameExact(position: Fraction, bpm: Fraction, sampleRate: number, beat: Fraction = QUARTER): number {
+  if (!Number.isInteger(sampleRate) || sampleRate <= 0) throw new MusicTheoryError("sampleRate must be a positive integer");
+  if (bpm.num <= 0 || beat.num <= 0) throw new MusicTheoryError("bpm and beat must be positive");
+  // frames = position / beat × 60 / bpm × sampleRate
+  const exact = fdiv(fmul(fdiv(position, beat), frac(60 * sampleRate)), bpm);
+  return ffloor(fadd(exact, frac(1, 2))); // round half up
 }
 
 export interface MetricModulationInput {

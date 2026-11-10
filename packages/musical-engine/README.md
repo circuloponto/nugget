@@ -14,7 +14,7 @@ Layers (`instrument` → `theory`; `ir` reads both; `time` and `audio` stand alo
 | `src/audio/` | plucked-string synthesis as pure `Float32Array` functions | Web Audio, any player |
 
 ```
-npm test               # 382 tests
+npm test               # 399 tests
 npm run build          # ESM + CJS + .d.ts into dist/
 ```
 
@@ -132,25 +132,55 @@ replaced by it.**
 - `validateMusicIR(unknown)` reports every problem with a path and never throws: version, unique ids, unknown references, bad fractions, pitch/MIDI mismatch, canonical event order, overlap inside a single-line voice, chord segments, tempo/meter. `normalizeMusicIR` sorts; `serializeMusicIR`/`parseMusicIR` round-trip to byte-identical text.
 - `scheduleFromIR`/`chordTimeline` turn it into seconds through the temporal engine.
 
+### Semantic verification (`src/ir/semantic.ts`)
+
+`validateMusicIR` runs a structural pass, then (only on a structurally valid document)
+`verifyMusicIRSemantics`:
+
+- every guitar `instrument` position must give the stated MIDI under the **stated** tuning (open-string MIDI + fret); a position without a tuning is an error; the document's `maxFret`/`minFret` and the constraint's tuning must agree with the voice's; one note per string at a time;
+- chord annotations must agree with the notes under them: root, quality, symbol, inversion, role and spelling; notes must belong to the chord's `voicing`, and a non-chord tone needs a melodic role.
+
+Playability stays an approximation (see below); this checks consistency, not comfort.
+
+### Rhythm, frames and playback (Phase 2)
+
+- `time/steps.ts`: step patterns (`.` rest, `x` hit, `A` accent, `-` tie) over a grid of 4, 6, 8, 12, 16, 5 or 7 steps become an exact `RhythmCell`; `rotateSteps`, `resamplePattern`, 13 `RHYTHM_PRESETS`.
+- `ir/rhythmize.ts`: `rhythmizeIR` re-times a progression document (modes `block`, `arpeggio`, `bass-chord`; `gate` scales note length). The pattern is recorded in a `rhythm-pattern` transformation so a saved file reopens in the editor. `ir/progression.ts`: `buildCycleProgressionIR`.
+- `ir/frames.ts`: `scheduleFrames` converts exact positions to integer sample frames once (`toSampleFrameExact`, rational, round half up, no accumulated drift). `ir/view.ts`: `chordViewAtFrame` answers which chord and which fretted notes sound at a frame.
+- `audio/render.ts` + `ir/playback.ts`: `renderDocument` renders the whole document offline into one `Float32Array` with each note at its exact frame; `wrapTail` makes the loop seamless (tested sample for sample).
+- Limit: rendering runs on the main thread (about a second for a long loop); the Lab debounces it. Timing is sample-exact in the buffer; I could not listen to it, and the on-screen playhead compensates `outputLatency` only as far as the browser reports it.
+
 ## Audio (`src/audio/`)
 
-`synthesizePluck(midi)` / `synthesizeChord(midis)` produce Karplus-Strong plucked-string
-samples as plain `Float32Array`s: deterministic, and tuned with a fractional-delay
-all-pass to well under 1 cent over the whole guitar range (tested to 3). The Lab wraps
-them in Web Audio; any other player can do the same.
+`synthesizePluck(midi)` / `synthesizeChord(midis)` produce plucked notes as plain
+`Float32Array`s: deterministic, and in tune to within 0.05 cent over the whole guitar
+range (tested to half a cent, with an estimator that is itself calibrated by a test).
+The Lab wraps them in Web Audio; any other player can do the same.
 
-Tone is three parameters (all 0..1 except `attackSeconds`):
+Two models, chosen with `model`:
+
+- **`"sine"`: almost a plucked sine wave.** A sine at the exact pitch, a soft attack, an
+  exponential decay, and a trace of upper partials (`brightness`: 0 is a pure sine, the
+  default 0.12 leaves a faint 2nd and 3rd harmonic). From C4 up, 98% of the power is the
+  fundamental over the first 60 ms; the string tones below manage 0 to 30% because they
+  start as a noise burst. **Below C4, `lowEnd` (default 1) gives low notes definition**: a
+  pure sine is clear up high but muddy low down (close chord notes beat inside each other's
+  critical band, and with no harmonics the ear can't tell which pitch is which). It adds
+  upper partials that die fast, eases the fundamental back by up to 40% (less boom), shortens
+  the ring by up to 35% and lengthens the fade-in to at least 1.25 periods with a cosine
+  ramp, all fading in between C4 and E2. `lowEnd: 0` turns it off; C4 and up are untouched.
+- **`"string"` (default): Karplus-Strong.** Guitar-like. Its tone is parameters:
 
 | Parameter | Effect | Lower means |
 |---|---|---|
 | `damping` | loop low-pass (symmetric 3-tap, so tuning never moves) | brighter, more strident |
 | `hardness` | how raw the initial noise burst is | rounder, less "pluck" |
-| `decay` | loop gain | shorter ring, less resonance |
+| `ringSeconds` | time to fade 60 dB, **the same at every pitch** (`decay` sets the raw loop gain instead) | shorter ring, less resonance |
 | `attackSeconds` | fade-in | n/a (higher = softer start) |
 
-`PLUCK_TONES` names three settings: `bright` (the original sound), `mellow` (the default:
-about 30% less bright, half the pluck spike, 35-45% shorter ring) and `soft` (no pluck
-spike, rings about half as long as the original). Measured, and locked in by tests.
+`PLUCK_TONES` names four settings: `sine` (the Lab's default, rings 1.2 s to -60 dB),
+`soft` (string, round, 1.1 s), `mellow` (string, 1.8 s) and `bright` (the original,
+strident string sound). Measured, and locked in by tests.
 
 ## About "playable"
 
@@ -163,7 +193,7 @@ every hand. The Lab and the exported MusicIR both say so.
 ## Known limits (deliberate, for this phase)
 
 - The harmonic engine is triads only (3 voices) and heptatonic scales (major, natural minor, harmonic minor). Seventh chords, extensions, melodic gestures and generalized events are **not** forced into `TriadVoicing`: they belong in MusicIR, with new voicing/adapters beside the existing ones.
-- Rhythm exists as an engine and in MusicIR, but the cycles still play one chord per beat; no rhythmic phrasing is generated yet.
+- Rhythm is user-edited step patterns applied identically to every chord; no generated phrasing, swing or per-chord patterns yet.
 - 12-TET only. Audio is a plucked-string model, not a sampled guitar.
 - No capo, no muted-string voicings, no barre geometry beyond finger counting.
 - Cycles 2/7's reference voice-leading tables are not the smoothest possible (4 scale steps of total motion vs 1 for cycles 3/6). They are kept for fidelity to the reference.

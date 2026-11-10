@@ -16,7 +16,7 @@ const MARKERS = new Set([3, 5, 7, 9, 12, 15, 17, 19, 21]);
 
 interface Props {
   board: Board;
-  scale: Scale;
+  scale?: Scale; // optional: a loaded document may not state a key
   frets: number; // highest fret to draw
   notes: DisplayNote[]; // the voicing being evaluated
   ghost?: DisplayNote[]; // previous chord, drawn as rings
@@ -49,12 +49,12 @@ export default function Fretboard({ board, scale, frets, notes, ghost = [], show
               const hit = at(notes, s, f);
               const prev = at(ghost, s, f);
               const m = midiAt(board, s, f);
-              const inScale = spellMidiInScale(scale, m);
+              const inScale = scale ? spellMidiInScale(scale, m) : undefined;
               const cls = ["cell", f === 0 ? "open" : "", MARKERS.has(f) && s === 2 ? "marker" : ""];
               return (
                 <div key={f} className={cls.join(" ")} title={`string ${board.tuning.strings.length - s}, fret ${f}`}>
                   <span className="wire" />
-                  {prev && !hit && <span className={`dot ghost ${prev.role}`} title={`previous: ${prev.pitch}`} />}
+                  {prev && !hit && <span className={`dot ghost ${prev.role}`} title={`in the chord, not sounding: ${prev.pitch}`} />}
                   {hit ? (
                     <span className={`dot ${hit.role}`} title={hit.pitch}>{hit.label}</span>
                   ) : (

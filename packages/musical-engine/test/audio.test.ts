@@ -3,32 +3,51 @@ import { midiToHz, MusicTheoryError, synthesizeChord, synthesizePluck } from "..
 
 const SR = 44100;
 
-/** Fundamental frequency by autocorrelation with parabolic interpolation, on a settled stretch of the note. */
+/**
+ * Fundamental frequency by phase tracking. Demodulate the note at the expected pitch over a
+ * series of windows; if the true pitch differs, the phase drifts steadily from window to
+ * window, and the slope of that drift is the error in Hz. Each window is a Hann-weighted
+ * four periods long, which keeps the mirror-image frequency from leaking into the phase.
+ * A note that is fading quickly does not bias it (a spectral peak or an autocorrelation over
+ * a fast-fading low note does: up to 11 cents at a 0.4 s ring on the low E).
+ */
 function estimateHz(samples: Float32Array, expectedHz: number): number {
-  const start = Math.round(SR * 0.15);
-  const len = Math.round(SR * 0.3);
-  const seg = samples.subarray(start, start + len + Math.ceil((SR / expectedHz) * 1.3));
-  const minLag = Math.floor((SR / expectedHz) * 0.8);
-  const maxLag = Math.ceil((SR / expectedHz) * 1.2);
-  const ac = (lag: number) => {
-    let s = 0;
-    for (let i = 0; i < len; i++) s += seg[i]! * seg[i + lag]!;
-    return s;
-  };
-  let bestLag = minLag;
-  let best = -Infinity;
-  for (let lag = minLag; lag <= maxLag; lag++) {
-    const v = ac(lag);
-    if (v > best) {
-      best = v;
-      bestLag = lag;
+  const len = Math.round((4 * SR) / expectedHz);
+  const w = (2 * Math.PI * expectedHz) / SR;
+  const phases: number[] = [];
+  const times: number[] = [];
+  for (let j = 0; j < 8; j++) {
+    const centre = Math.round(SR * (0.12 + j * 0.04));
+    const from = centre - Math.floor(len / 2);
+    if (from < 0 || from + len > samples.length) continue;
+    let re = 0;
+    let im = 0;
+    for (let k = 0; k < len; k++) {
+      const i = from + k;
+      const hann = 0.5 * (1 - Math.cos((2 * Math.PI * (k + 0.5)) / len));
+      re += hann * samples[i]! * Math.cos(w * i);
+      im -= hann * samples[i]! * Math.sin(w * i);
     }
+    phases.push(Math.atan2(im, re));
+    times.push(centre / SR);
   }
-  const y0 = ac(bestLag - 1);
-  const y1 = ac(bestLag);
-  const y2 = ac(bestLag + 1);
-  const shift = (y0 - y2) / (2 * (y0 - 2 * y1 + y2));
-  return SR / (bestLag + shift);
+  // unwrap, then least-squares slope of phase against time
+  const un = [phases[0]!];
+  for (let j = 1; j < phases.length; j++) {
+    let d = phases[j]! - phases[j - 1]!;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    un.push(un[j - 1]! + d);
+  }
+  const tm = times.reduce((a, b) => a + b, 0) / times.length;
+  const pm = un.reduce((a, b) => a + b, 0) / un.length;
+  let num = 0;
+  let den = 0;
+  for (let j = 0; j < un.length; j++) {
+    num += (times[j]! - tm) * (un[j]! - pm);
+    den += (times[j]! - tm) ** 2;
+  }
+  return expectedHz + num / den / (2 * Math.PI);
 }
 
 const cents = (a: number, b: number) => 1200 * Math.log2(a / b);
@@ -46,12 +65,22 @@ describe("plucked-string synthesis", () => {
     expect(midiToHz(64)).toBeCloseTo(329.6276, 3); // high E open
   });
 
-  it("every pitch the guitar can play (E2 to D6) sounds within 3 cents of the right frequency", () => {
+  it("the pitch estimator itself is trustworthy: it recovers a known detuning of a fading sine to 0.2 cent", () => {
+    for (const [midi, detune, fadeSeconds] of [[40, 0, 0.4], [40, 7, 0.4], [40, -12, 0.3], [64, 5, 1], [64, -9, 0.4], [86, 3, 0.5]] as const) {
+      const hz = midiToHz(midi);
+      const actual = hz * Math.pow(2, detune / 1200);
+      const x = new Float32Array(SR);
+      for (let i = 0; i < x.length; i++) x[i] = Math.sin((2 * Math.PI * actual * i) / SR) * Math.exp(-i / SR / (fadeSeconds / 6.9));
+      expect(Math.abs(cents(estimateHz(x, hz), actual)), `MIDI ${midi} detuned ${detune}c, fading in ${fadeSeconds}s`).toBeLessThan(0.2);
+    }
+  });
+
+  it("every pitch the guitar can play (E2 to D6) sounds within half a cent of the right frequency", () => {
     // measured worst case is under 1 cent; a one-sample error in the delay line would be ~11-50 cents
     for (let m = 40; m <= 86; m++) {
       const hz = midiToHz(m);
       const est = estimateHz(synthesizePluck(m, { sampleRate: SR, seconds: 1 }), hz);
-      expect(Math.abs(cents(est, hz)), `MIDI ${m} (${hz.toFixed(1)} Hz) measured ${est.toFixed(2)} Hz`).toBeLessThan(3);
+      expect(Math.abs(cents(est, hz)), `MIDI ${m} (${hz.toFixed(1)} Hz) measured ${est.toFixed(2)} Hz`).toBeLessThan(0.5);
     }
   });
 
@@ -147,6 +176,7 @@ describe("chord synthesis", () => {
 import { PLUCK_TONES, type PluckTone } from "../src";
 
 const TONES: PluckTone[] = ["bright", "mellow", "soft"];
+const ALL_TONES: PluckTone[] = ["sine", "soft", "mellow", "bright"];
 const PITCHES = [45, 52, 59, 66, 73];
 const note = (m: number, tone: PluckTone) => synthesizePluck(m, { ...PLUCK_TONES[tone], sampleRate: SR, seconds: 2.5 });
 const at = (s: number) => Math.round(SR * s);
@@ -168,12 +198,12 @@ const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 const over = (f: (x: Float32Array) => number, tone: PluckTone) => mean(PITCHES.map((m) => f(note(m, tone))));
 
 describe("tone: softer, less pluck, less resonance", () => {
-  it("every tone stays in tune (within 3 cents on every guitar pitch)", () => {
-    for (const tone of TONES) {
+  it("every tone stays in tune (within half a cent on every guitar pitch)", () => {
+    for (const tone of ALL_TONES) {
       for (let m = 40; m <= 86; m += 2) {
         const hz = midiToHz(m);
         const est = estimateHz(note(m, tone), hz);
-        expect(Math.abs(cents(est, hz)), `${tone} MIDI ${m}`).toBeLessThan(3);
+        expect(Math.abs(cents(est, hz)), `${tone} MIDI ${m}`).toBeLessThan(0.5);
       }
     }
   });
@@ -237,6 +267,222 @@ describe("tone: softer, less pluck, less resonance", () => {
     for (const bad of [{ damping: 5 }, { damping: -1 }, { hardness: 9 }, { hardness: -3 }]) {
       const x = synthesizePluck(52, { sampleRate: SR, seconds: 0.3, ...bad });
       for (const v of x) expect(Number.isFinite(v)).toBe(true);
+    }
+  });
+});
+
+// ── "almost a plucked sine wave" ──────────────────────────────────────────
+/**
+ * Purity: the share of ALL the power (noise and every partial included) that sits at the
+ * fundamental, over the first 60 ms where a pluck's character lives. The window is a whole
+ * number of periods so nothing leaks.
+ */
+function purity(x: Float32Array, hz: number): number {
+  const per = SR / hz;
+  const from = Math.round(SR * 0.01);
+  const to = Math.round(from + Math.floor((SR * 0.06) / per) * per);
+  let re = 0;
+  let im = 0;
+  let total = 0;
+  const w = (2 * Math.PI * hz) / SR;
+  for (let i = from; i < to; i++) {
+    re += x[i]! * Math.cos(w * i);
+    im += x[i]! * Math.sin(w * i);
+    total += x[i]! ** 2;
+  }
+  const n = to - from;
+  return ((2 / n) ** 2 * (re * re + im * im)) / 2 / (total / n);
+}
+const timeToMinus20 = (x: Float32Array) => {
+  const ref = rms(x, at(0.2), at(0.3));
+  for (let s = 0.3; s < 2.4; s += 0.025) if (rms(x, at(s), at(s + 0.05)) < ref * 0.1) return s - 0.25;
+  return Infinity;
+};
+
+describe("the sine tone: almost a plucked sine wave", () => {
+  const sine = (m: number, extra = {}) => synthesizePluck(m, { ...PLUCK_TONES.sine, sampleRate: SR, seconds: 2.5, ...extra });
+
+  it("is nearly pure: 97%+ of the power is the fundamental, from C4 up (the low register is deliberately richer)", () => {
+    for (let m = 60; m <= 84; m += 3) {
+      expect(purity(sine(m), midiToHz(m)), `MIDI ${m}`).toBeGreaterThan(0.97);
+    }
+    // and with the low-end treatment switched off it is pure all the way down
+    for (let m = 40; m <= 58; m += 3) {
+      expect(purity(sine(m, { lowEnd: 0 }), midiToHz(m)), `MIDI ${m} lowEnd 0`).toBeGreaterThan(0.97);
+    }
+  });
+
+  it("is far purer than any of the string tones, which start as noise", () => {
+    for (const m of [43, 52, 61, 70]) {
+      const s = purity(sine(m), midiToHz(m));
+      for (const tone of TONES) expect(s, `${tone} MIDI ${m}`).toBeGreaterThan(purity(note(m, tone), midiToHz(m)) * 2);
+    }
+  });
+
+  it("brightness is the dial: 0 is a pure sine, and more brightness means more upper partials", () => {
+    const p0 = purity(sine(64, { brightness: 0 }), midiToHz(64));
+    const p12 = purity(sine(64, { brightness: 0.12 }), midiToHz(64));
+    const p40 = purity(sine(64, { brightness: 0.4 }), midiToHz(64));
+    // (a fading sine is not a perfectly thin line, so even 0 is a hair under 1 in this measure)
+    expect(p0).toBeGreaterThan(0.985);
+    expect(p12).toBeLessThan(p0 - 0.003);
+    expect(p12).toBeGreaterThan(0.97);
+    expect(p40).toBeLessThan(p12 - 0.03);
+  });
+
+  it("is exactly in tune (the pitch is set directly, not by a delay line): within 0.5 cent", () => {
+    for (let m = 40; m <= 86; m++) {
+      const hz = midiToHz(m);
+      expect(Math.abs(cents(estimateHz(sine(m), hz), hz)), `MIDI ${m}`).toBeLessThan(0.5);
+    }
+  });
+
+  it("starts softly (no click) and rings out", () => {
+    const x = sine(57);
+    expect(x[0]).toBe(0);
+    expect(rms(x, 0, at(0.002))).toBeLessThan(rms(x, at(0.05), at(0.1)) * 0.3);
+    expect(rms(x, at(2.0), at(2.4))).toBeLessThan(rms(x, at(0.05), at(0.3)) * 0.05);
+    expect(Math.abs(x[x.length - 1]!)).toBeLessThan(1e-3);
+    let peak = 0;
+    for (const v of x) {
+      expect(Number.isFinite(v)).toBe(true);
+      peak = Math.max(peak, Math.abs(v));
+    }
+    expect(peak).toBeLessThanOrEqual(0.9 + 1e-6);
+  });
+
+  it("rings for the same time at every pitch (a low note does not outlast a high one) when lowEnd is off", () => {
+    // ringSeconds is the time to fade 60 dB, so 20 dB takes a third of it
+    const expected = 1.2 / 3;
+    for (const m of [40, 52, 64, 76, 84]) {
+      const t = timeToMinus20(sine(m, { lowEnd: 0 }));
+      expect(t, `MIDI ${m}`).toBeGreaterThan(expected * 0.85);
+      expect(t, `MIDI ${m}`).toBeLessThan(expected * 1.15);
+    }
+  });
+
+  it("with lowEnd, notes below C4 ring shorter (up to 35% at E2) and notes from C4 up are unchanged", () => {
+    for (const m of [40, 46, 52, 58]) {
+      const expected = (1.2 * (1 - 0.35 * Math.min(1, (60 - m) / 20))) / 3;
+      const t = timeToMinus20(sine(m));
+      expect(t, `MIDI ${m}`).toBeGreaterThan(expected * 0.85);
+      expect(t, `MIDI ${m}`).toBeLessThan(expected * 1.15);
+    }
+    for (const m of [60, 64, 76]) {
+      const t = timeToMinus20(sine(m));
+      expect(t, `MIDI ${m}`).toBeGreaterThan((1.2 / 3) * 0.85);
+      expect(t, `MIDI ${m}`).toBeLessThan((1.2 / 3) * 1.15);
+    }
+  });
+
+  it("the string tones now ring for the same time at every pitch too", () => {
+    for (const [tone, ring] of [["mellow", 1.8], ["soft", 1.1]] as const) {
+      const times = [43, 52, 61, 70, 78].map((m) => timeToMinus20(note(m, tone)));
+      for (const t of times) {
+        expect(t, tone).toBeGreaterThan((ring / 3) * 0.75);
+        expect(t, tone).toBeLessThan((ring / 3) * 1.25);
+      }
+    }
+  });
+
+  it("rings shorter than the mellow string, and a longer ringSeconds really rings longer", () => {
+    expect(timeToMinus20(sine(55))).toBeLessThan(timeToMinus20(note(55, "mellow")));
+    expect(timeToMinus20(sine(55, { ringSeconds: 3 }))).toBeGreaterThan(timeToMinus20(sine(55, { ringSeconds: 0.6 })) * 4);
+  });
+
+  it("works in chords, deterministically, and never lets a partial pass the Nyquist frequency", () => {
+    const chord = synthesizeChord([48, 52, 55], { ...PLUCK_TONES.sine, seconds: 1 });
+    expect(chord).toHaveLength(44100);
+    expect(Array.from(chord.subarray(0, 2000))).toEqual(
+      Array.from(synthesizeChord([48, 52, 55], { ...PLUCK_TONES.sine, seconds: 1 }).subarray(0, 2000)),
+    );
+    // MIDI 96 (2093 Hz) at a low sample rate: the upper partials are dropped, not aliased
+    const high = synthesizePluck(96, { model: "sine", sampleRate: 11025, seconds: 0.3, brightness: 0.5 });
+    for (const v of high) expect(Number.isFinite(v)).toBe(true);
+    expect(() => synthesizePluck(110, { model: "sine", sampleRate: 8000 })).toThrow(MusicTheoryError);
+  });
+
+  it("lowEnd leaves C4 and above exactly as they were, and 0 switches it off everywhere", () => {
+    for (const m of [60, 64, 72, 84]) {
+      expect(Array.from(sine(m, { lowEnd: 1 }).subarray(0, 3000)), `MIDI ${m}`).toEqual(Array.from(sine(m, { lowEnd: 0 }).subarray(0, 3000)));
+    }
+    expect(Array.from(sine(45, { lowEnd: 1 }).subarray(0, 3000))).not.toEqual(Array.from(sine(45, { lowEnd: 0 }).subarray(0, 3000)));
+  });
+
+  it("low notes get progressively richer the lower they are (more upper partials), so the ear can tell the pitch", () => {
+    const p = [40, 46, 52, 58].map((m) => purity(sine(m), midiToHz(m)));
+    for (let i = 1; i < p.length; i++) expect(p[i]!, `step ${i}`).toBeGreaterThan(p[i - 1]!);
+    expect(p[3]!).toBeLessThan(purity(sine(64), midiToHz(64))); // MIDI 58 is already (slightly) richer than C4 and up
+    expect(p[0]!).toBeLessThan(0.85); // MIDI 40 is clearly richer than the 0.98 of the high register
+    expect(p[0]!).toBeGreaterThan(0.5); // ...but still mostly sine, not a different instrument
+  });
+
+  it("the extra partials are an attack: they die away much faster than the fundamental", () => {
+    const hz = midiToHz(43);
+    const x = sine(43);
+    const upper = (from: number, to: number) => {
+      let re = 0;
+      let im = 0;
+      const w = (4 * Math.PI * hz) / SR; // 2nd partial
+      for (let i = at(from); i < at(to); i++) {
+        re += x[i]! * Math.cos(w * i);
+        im += x[i]! * Math.sin(w * i);
+      }
+      return Math.hypot(re, im) / (at(to) - at(from));
+    };
+    const fundamental = (from: number, to: number) => {
+      let re = 0;
+      let im = 0;
+      const w = (2 * Math.PI * hz) / SR;
+      for (let i = at(from); i < at(to); i++) {
+        re += x[i]! * Math.cos(w * i);
+        im += x[i]! * Math.sin(w * i);
+      }
+      return Math.hypot(re, im) / (at(to) - at(from));
+    };
+    const early = upper(0.03, 0.13) / fundamental(0.03, 0.13);
+    const late = upper(0.5, 0.6) / fundamental(0.5, 0.6);
+    expect(early).toBeGreaterThan(0.3);
+    expect(late).toBeLessThan(early * 0.25);
+  });
+
+  it("low notes fade in over at least 1.25 periods with a smooth (cosine) ramp, so there is no thud", () => {
+    const early = (m: number) => rms(sine(m), 0, at(0.005)) / rms(sine(m), at(0.05), at(0.1));
+    // the 82 Hz note takes ~15 ms to fade in, the 330 Hz note 8 ms: its first 5 ms are far quieter
+    expect(early(40)).toBeLessThan(early(64) * 0.7);
+    // smooth: the fade is a raised cosine, so it starts flat (no corner) rather than as a straight ramp
+    const x = sine(40);
+    const periods125 = Math.round((1.25 * SR) / midiToHz(40));
+    expect(Math.abs(x[Math.round(periods125 / 20)]!)).toBeLessThan(0.02);
+  });
+
+  it("easing the fundamental back reduces the boom: less of the low-note energy sits in the lowest octave", () => {
+    const hz = midiToHz(40);
+    const share = (x: Float32Array) => {
+      const a = at(0.02);
+      const b = at(0.12);
+      const bin = (f: number) => {
+        let re = 0;
+        let im = 0;
+        const w = (2 * Math.PI * f) / SR;
+        for (let i = a; i < b; i++) {
+          re += x[i]! * Math.cos(w * i);
+          im += x[i]! * Math.sin(w * i);
+        }
+        return re * re + im * im;
+      };
+      return bin(hz) / (bin(hz) + bin(2 * hz) + bin(3 * hz) + bin(4 * hz));
+    };
+    // the fundamental's share of the first four partials drops by about a sixth (0.99 -> 0.82)
+    expect(share(sine(40, { lowEnd: 1 }))).toBeLessThan(share(sine(40, { lowEnd: 0 })) * 0.9);
+  });
+
+  it("rejects bad ring times and clamps odd brightness values", () => {
+    expect(() => synthesizePluck(60, { model: "sine", ringSeconds: 0 })).toThrow(MusicTheoryError);
+    expect(() => synthesizePluck(60, { ringSeconds: -1 })).toThrow(MusicTheoryError);
+    for (const b of [-1, 5]) {
+      for (const v of synthesizePluck(60, { model: "sine", seconds: 0.2, brightness: b })) expect(Number.isFinite(v)).toBe(true);
+      for (const v of synthesizePluck(45, { model: "sine", seconds: 0.2, lowEnd: b })) expect(Number.isFinite(v)).toBe(true);
     }
   });
 });

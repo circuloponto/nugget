@@ -6,9 +6,10 @@
   "scripts": {
     "build:engine": "npm run build -w @musical-lab/engine",
     "test": "npm run test -w @musical-lab/engine",
-    "typecheck": "npm run typecheck -w @musical-lab/engine",
+    "typecheck": "npm run typecheck -w @musical-lab/engine && npm run build:engine && npm run typecheck -w musical-lab-app",
     "dev": "npm run build:engine && npm run dev -w musical-lab-app",
     "dev:webpack": "npm run build:engine && npm run dev:webpack -w musical-lab-app",
-    "build": "npm run build:engine && npm run build -w musical-lab-app"
+    "build": "npm run build:engine && npm run build -w musical-lab-app",
+    "verify": "npm run test && npm run typecheck && npm run build"
   }
 }

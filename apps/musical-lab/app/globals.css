@@ -46,6 +46,11 @@ select:focus, input:focus, button:focus-visible { outline: 2px solid var(--brass
 .chip.active b, .chip.active em { color: var(--surface); }
 .chip:disabled { opacity: 0.4; cursor: default; }
 .chip.wrapped { border-left: 4px solid var(--brass); }
+.shaping .sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px 22px; margin-bottom: 8px; }
+.slider-row { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--ink-soft); }
+.slider-row b { color: var(--brass); font-weight: 600; margin-left: 4px; }
+.slider-row input[type="range"] { width: 100%; accent-color: var(--brass); }
+.slider-row em { font-style: normal; font-size: 11px; color: var(--stone); }
 .export { margin-top: 8px; padding: 7px 12px; border: 1px solid var(--stone-light); background: var(--surface); border-radius: 6px; cursor: pointer; font: inherit; font-size: 13px; }
 .export:hover { background: var(--brass-glow); }
 .hint { margin: 0 0 14px; font-size: 14px; color: var(--ink-soft); }
@@ -107,3 +112,63 @@ tbody tr.sel { background: var(--brass-glow); font-weight: 600; }
 @media (max-width: 600px) {
   .lab { padding: 16px 10px 48px; }
 }
+
+/* ── Musical Lab (phase 2) ─────────────────────────────────────────────── */
+.lab2-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; justify-content: space-between; margin-bottom: 14px; }
+.lab2-head h1 { margin: 0; font-size: 26px; }
+.lab2-head h1 span { color: var(--brass); font-weight: 400; font-size: 16px; margin-left: 8px; }
+.lab2-head p { margin: 4px 0 0; color: var(--ink-soft); font-size: 14px; }
+.lab2-head a { color: var(--brass); }
+.docbar { display: flex; gap: 8px; }
+.lab2 button { font: inherit; font-size: 14px; padding: 7px 12px; border: 1px solid var(--stone-light); background: var(--surface); border-radius: 6px; cursor: pointer; color: var(--ink); }
+.lab2 button:hover:not(:disabled) { background: var(--brass-glow); }
+.lab2 button:disabled { opacity: 0.45; cursor: default; }
+.lab2 .controls.locked label { opacity: 0.5; }
+.loaded-note { grid-column: 1 / -1; font-size: 13px; color: var(--ink-soft); background: var(--brass-glow); border-radius: 8px; padding: 8px 12px; }
+.loaded-note button { margin-left: 8px; }
+.error ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+.error code { background: rgba(0,0,0,0.06); }
+
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.transport .play { background: var(--brass); color: var(--surface); border-color: var(--brass); font-weight: 600; min-width: 96px; }
+.transport .play:hover:not(:disabled) { background: var(--brass-soft); }
+.readout { font-variant-numeric: tabular-nums; font-size: 15px; margin-left: 6px; }
+.zoom { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--stone); margin-left: auto; }
+.zoom input { width: 110px; accent-color: var(--brass); }
+
+.prog { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; align-items: center; }
+.prog-chip { display: flex; flex-direction: column; align-items: center; min-width: 62px; padding: 6px 10px; line-height: 1.2; }
+.prog-chip small { color: var(--stone); font-size: 11px; min-height: 13px; }
+.prog-chip b { font-size: 17px; }
+.prog-chip i { font-style: normal; font-size: 10px; color: var(--stone); min-height: 12px; }
+.lab2 .prog-chip.active { background: var(--brass); border-color: var(--brass); color: var(--surface); }
+.prog-chip.active small, .prog-chip.active i { color: var(--surface); }
+.prog-loop { color: var(--brass); font-size: 20px; padding: 0 4px; }
+
+.tl-scroll { overflow-x: auto; border: 1px solid var(--stone-lighter); border-radius: 6px; background: var(--paper); position: relative; }
+.tl { position: relative; }
+.tl svg { display: block; cursor: crosshair; }
+.tl-chord { fill: var(--stone-lighter); stroke: var(--surface); stroke-width: 1; }
+.tl-chord.active { fill: var(--brass-soft); }
+.tl-chord-label { font-size: 12px; font-weight: 600; fill: var(--ink); pointer-events: none; }
+.tl-step { stroke: var(--stone-light); stroke-width: 1; stroke-dasharray: 2 3; }
+.tl-beat { stroke: var(--stone-light); stroke-width: 1; }
+.tl-bar { stroke: var(--stone); stroke-width: 1.5; }
+.tl-playhead { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: #c0392b; pointer-events: none; will-change: transform; box-shadow: 0 0 0 1px rgba(192,57,43,0.25); }
+
+.rhythm h2 { margin: 0 0 10px; font-size: 16px; }
+.rhythm h2 small { color: var(--stone); font-weight: 400; margin-left: 8px; }
+.rhythm-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.rhythm-top label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+.rhythm-top b { color: var(--brass); text-transform: none; }
+.steps { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+.lab2 .step { min-width: 40px; height: 44px; padding: 0 6px; font-size: 18px; border-radius: 8px; }
+.lab2 .step.group-start { margin-left: 8px; }
+.lab2 .step.group-start:first-child { margin-left: 0; }
+.lab2 .step-rest { color: var(--stone); background: var(--paper); }
+.lab2 .step-hit { background: var(--brass-soft); border-color: var(--brass); color: var(--surface); }
+.lab2 .step-accent { background: var(--brass); border-color: var(--ink); color: var(--surface); font-weight: 700; }
+.lab2 .step-tie { background: var(--stone-lighter); border-style: dashed; color: var(--ink-soft); }
+.rhythm-bottom { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rhythm-bottom .muted { font-size: 13px; color: var(--stone); }
+.docinfo p { margin: 0 0 6px; font-size: 14px; }

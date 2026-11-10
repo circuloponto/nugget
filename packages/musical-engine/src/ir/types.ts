@@ -76,6 +76,17 @@ export interface IRVoice {
   readonly instrument?: { readonly name: string; readonly tuning?: readonly string[] };
 }
 
+/**
+ * One voice of a chord as voiced: which voice, which exact pitch, and (on a fretted
+ * instrument) where it is played. The canonical record of the chord's voicing, so the
+ * notes under it can be re-timed (a new rhythm) without losing a voice.
+ */
+export interface IRVoicedNote {
+  readonly voice: string;
+  readonly pitch: IRPitch;
+  readonly instrument?: { readonly string: number; readonly fret: number };
+}
+
 /** A harmony annotation over a time span. */
 export interface IRChordSegment {
   readonly id: string;
@@ -89,6 +100,8 @@ export interface IRChordSegment {
   /** Spelled chord tones, root first. */
   readonly tones: readonly string[];
   readonly inversion?: number;
+  /** The chord as voiced, bass first. Every note under this segment must be one of these. */
+  readonly voicing?: readonly IRVoicedNote[];
   readonly key?: { readonly tonic: string; readonly scale: string };
   readonly provenance?: IRProvenance;
 }

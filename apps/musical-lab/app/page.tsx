@@ -1,5 +1,5 @@
-import Lab from "./Lab";
+import MusicalLab from "./lab/MusicalLab";
 
 export default function Home() {
-  return <Lab />;
+  return <MusicalLab />;
 }
