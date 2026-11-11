@@ -4,3 +4,9 @@ dist/
 *.tsbuildinfo
 next-env.d.ts
 *.log
+
+# Phase 3H corpus: GPL-3.0 dataset, research use only until its licence and intended uses are reviewed.
+# Keep the folder's README; ignore the archives, imported scores and generated analyses.
+data/corpus/**
+!data/corpus/
+!data/corpus/README.md

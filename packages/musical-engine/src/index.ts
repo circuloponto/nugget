@@ -47,3 +47,6 @@ export * from "./ir/view";
 
 // ── musical grammar (Phase 3) ─────────────────────────────────────────────
 export * from "./grammar";
+
+// ── corpus import and analysis (Phase 3H); namespaced because its helpers have generic names ──
+export * as corpus from "./corpus";

@@ -2,7 +2,10 @@
   "name": "musical-knowledge",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "build:engine": "npm run build -w @musical-lab/engine",
     "test": "npm run test -w @musical-lab/engine",
@@ -10,6 +13,7 @@
     "dev": "npm run build:engine && npm run dev -w musical-lab-app",
     "dev:webpack": "npm run build:engine && npm run dev:webpack -w musical-lab-app",
     "build": "npm run build:engine && npm run build -w musical-lab-app",
-    "verify": "npm run test && npm run typecheck && npm run build"
+    "verify": "npm run test && npm run typecheck && npm run build",
+    "corpus": "npm run build:engine && node scripts/corpus.mjs"
   }
 }
