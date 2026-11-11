@@ -265,7 +265,7 @@ export default function CorpusExplorer() {
           </h1>
           <p>
             Real melodies, measured. Inspect an imported piece, hear it, and see how its rhythm, contour, motifs and phrase boundaries were read; every boundary is a hypothesis with its evidence. <a href="/">← Musical Lab</a> ·{" "}
-            <a href="/phrase">Phrase Constructor →</a>
+            <a href="/phrase">Phrase Constructor →</a> · <a href="/corpus/compare">Generator against the corpus →</a>
           </p>
         </div>
       </header>

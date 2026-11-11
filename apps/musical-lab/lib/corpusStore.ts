@@ -68,3 +68,12 @@ export function loadPiece(corpusId: string, pieceId: string): { piece: unknown; 
   };
   return { piece: read("pieces"), ir: read("ir"), analysis: read("analysis") };
 }
+
+/** The generator-against-corpus comparison written by scripts/compare.mjs, or null if it has not been run. */
+export function loadComparison(corpusId: string): unknown | null {
+  if (!SAFE_ID.test(corpusId)) return null;
+  const root = corpusRoot();
+  if (!root) return null;
+  const p = join(/*turbopackIgnore: true*/ root, corpusId, "comparison.json");
+  return existsSync(p) ? readJson(p) : null;
+}

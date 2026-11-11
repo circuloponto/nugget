@@ -12,3 +12,6 @@ export * from "./analysis/melodic";
 export * from "./analysis/phrases";
 export * from "./analysis/harmony";
 export * from "./analysis/analyze";
+export * from "./split";
+export * from "./generatorSample";
+export * from "./compare";
