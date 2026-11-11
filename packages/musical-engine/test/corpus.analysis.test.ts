@@ -239,3 +239,40 @@ describe("analysis is reproducible and aggregates keep their sources", () => {
     expect(ab.methods.length).toBeGreaterThan(0);
   });
 });
+
+describe("comparing two phrases", () => {
+  const prof = (spec: string[]) => corpus.phraseProfile(lineOf([notes(spec[0]!), notes(spec[1] ?? "G4:16")]), 0, spec[0]!.trim().split(/\s+/).length - 1);
+  const A = prof(["C4:4 D4:4 E4:4 F4:4"]);
+  const same = prof(["C4:4 D4:4 E4:4 F4:4"]);
+  const newPitches = prof(["G4:4 F4:4 D4:4 C4:4"]);
+  const newRhythm = prof(["C4:6 D4:2 E4:4 F4:4"]);
+
+  it("identical phrases are identical in every aspect and are an exact repeat", () => {
+    const c = corpus.comparePhraseProfiles(A, same);
+    expect(c.aspects).toEqual({ rhythm: 1, intervals: 1, contour: 1, activity: 1, ending: 1, register: 1 });
+    expect(c.overall).toBe(1);
+    expect(c.relation).toBe("exact-repeat");
+  });
+
+  it("is symmetric", () => {
+    expect(corpus.comparePhraseProfiles(A, newRhythm).aspects).toEqual(corpus.comparePhraseProfiles(newRhythm, A).aspects);
+    expect(corpus.comparePhraseProfiles(A, newPitches).overall).toBe(corpus.comparePhraseProfiles(newPitches, A).overall);
+  });
+
+  it("separates what changed: same rhythm with new pitches, and the same pitches with a new rhythm", () => {
+    const p = corpus.comparePhraseProfiles(A, newPitches);
+    expect(p.aspects.rhythm).toBe(1);
+    expect(p.aspects.intervals).toBeLessThan(0.5);
+    expect(p.aspects.contour).toBeLessThan(0.5);
+    expect(p.relation).toBe("same-rhythm-new-pitches");
+    expect(p.statements).toEqual(expect.arrayContaining(["nearly the same rhythm", "contour: ascending against descending"]));
+    const r = corpus.comparePhraseProfiles(A, newRhythm);
+    expect(r.aspects.intervals).toBe(1);
+    expect(r.aspects.rhythm).toBeLessThan(0.9);
+    expect(r.statements).toContain("nearly the same melodic intervals");
+  });
+
+  it("exposes exact onsets for drawing a rhythm", () => {
+    expect(corpus.profileOnsets(newRhythm)).toEqual(["0", "3/8", "1/2", "3/4"]);
+  });
+});

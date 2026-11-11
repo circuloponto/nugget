@@ -320,17 +320,7 @@ export function analyzePhrases(line: MelodyLine): PhraseAnalysis {
     for (let j = i + 1; j < Math.min(phrases.length, i + 4); j++) {
       const a = phrases[i]!.profile;
       const b = phrases[j]!.profile;
-      const rs = jaccard(a.rhythm.map((t, k) => `${k}:${t}`), b.rhythm.map((t, k) => `${k}:${t}`));
-      const n = Math.min(a.intervals.length, b.intervals.length);
-      const eq = Array.from({ length: n }, (_, k) => a.intervals[k] === b.intervals[k]);
-      const isim = n === 0 ? 0 : eq.filter(Boolean).length / Math.max(a.intervals.length, b.intervals.length);
-      const sameBody = n >= 4 && eq.slice(0, Math.max(0, n - 2)).every(Boolean);
-      let kind: PhraseRelationKind;
-      if (a.intervals.length === b.intervals.length && eq.every(Boolean) && rs > 0.99) kind = "exact-repeat";
-      else if (sameBody && rs >= 0.6) kind = "repeat-modified-ending";
-      else if (rs >= 0.8 && isim < 0.6) kind = "same-rhythm-new-pitches";
-      else if (a.contour.shape === b.contour.shape && rs < 0.6) kind = "same-contour-new-rhythm";
-      else kind = "contrast";
+      const { kind, rhythmSimilarity: rs, intervalSimilarity: isim } = relateProfiles(a, b);
       if (kind !== "contrast" || j === i + 1) relations.push({ from: phrases[i]!.id, to: phrases[j]!.id, kind, rhythmSimilarity: round(rs, 3), intervalSimilarity: round(isim, 3) });
     }
   }
@@ -428,4 +418,86 @@ export function phraseProfile(line: MelodyLine, from: number, to: number): Phras
     rhythm: seg.map((n) => fstr(n.duration)),
     intervals: intervalsOfMidi(ms),
   };
+}
+
+// ── relating and comparing two phrases ───────────────────────────────────
+const posKeys = (xs: readonly string[]) => xs.map((t, k) => `${k}:${t}`);
+
+/** How two phrases relate, by the same rules used between neighbouring phrases of one piece. */
+export function relateProfiles(a: PhraseProfile, b: PhraseProfile): { kind: PhraseRelationKind; rhythmSimilarity: number; intervalSimilarity: number } {
+  const rs = jaccard(posKeys(a.rhythm), posKeys(b.rhythm));
+  const n = Math.min(a.intervals.length, b.intervals.length);
+  const eq = Array.from({ length: n }, (_, k) => a.intervals[k] === b.intervals[k]);
+  const isim = n === 0 ? 0 : eq.filter(Boolean).length / Math.max(a.intervals.length, b.intervals.length);
+  const sameBody = n >= 4 && eq.slice(0, Math.max(0, n - 2)).every(Boolean);
+  let kind: PhraseRelationKind;
+  if (a.intervals.length === b.intervals.length && eq.every(Boolean) && rs > 0.99) kind = "exact-repeat";
+  else if (sameBody && rs >= 0.6) kind = "repeat-modified-ending";
+  else if (rs >= 0.8 && isim < 0.6) kind = "same-rhythm-new-pitches";
+  else if (a.contour.shape === b.contour.shape && rs < 0.6) kind = "same-contour-new-rhythm";
+  else kind = "contrast";
+  return { kind, rhythmSimilarity: rs, intervalSimilarity: isim };
+}
+
+function lcsRatio<T>(a: readonly T[], b: readonly T[]): number {
+  if (a.length === 0 && b.length === 0) return 1;
+  const dp: number[][] = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
+  for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) dp[i]![j] = a[i] === b[j] ? dp[i + 1]![j + 1]! + 1 : Math.max(dp[i + 1]![j]!, dp[i]![j + 1]!);
+  return dp[0]![0]! / Math.max(a.length, b.length);
+}
+
+/** Onset positions (exact fractions of a whole note from the phrase start) of a profile's notes. */
+export function profileOnsets(p: PhraseProfile): string[] {
+  const out: string[] = [];
+  let t: Fraction = { num: 0, den: 1 };
+  for (const d of p.rhythm) {
+    out.push(fstr(t));
+    const [n, den] = d.split("/");
+    t = fadd(t, { num: Number(n), den: den === undefined ? 1 : Number(den) });
+  }
+  return out;
+}
+
+export interface PhraseComparison {
+  /** Similarity 0 (nothing shared) .. 1 (identical), per aspect. */
+  readonly aspects: { readonly rhythm: number; readonly intervals: number; readonly contour: number; readonly activity: number; readonly ending: number; readonly register: number };
+  readonly overall: number;
+  readonly relation: PhraseRelationKind;
+  /** Plain statements of what is alike and what differs. */
+  readonly statements: readonly string[];
+}
+
+const COMPARE_WEIGHTS = { rhythm: 0.3, intervals: 0.25, contour: 0.15, activity: 0.1, ending: 0.1, register: 0.1 } as const;
+
+/** Compare two phrase profiles aspect by aspect. Symmetric. Each aspect is a similarity in 0..1. */
+export function comparePhraseProfiles(a: PhraseProfile, b: PhraseProfile): PhraseComparison {
+  const rhythm = (jaccard(profileOnsets(a), profileOnsets(b)) + lcsRatio(a.rhythm, b.rhythm)) / 2;
+  const intervals = lcsRatio(a.intervals, b.intervals);
+  const contour = lcsRatio([...a.contour.shape], [...b.contour.shape]);
+  const norm = (t: readonly number[]) => {
+    const s = t.reduce((x, y) => x + y, 0) || 1;
+    return t.map((x) => x / s);
+  };
+  const na = norm(a.activityThirds);
+  const nb = norm(b.activityThirds);
+  const activity = 1 - na.reduce((acc, x, i) => acc + Math.abs(x - nb[i]!), 0) / 2;
+  const fb = Math.min(a.ending.finalBeats, b.ending.finalBeats) / Math.max(a.ending.finalBeats, b.ending.finalBeats, 1e-9);
+  const ending = (fb + (a.ending.approach === b.ending.approach ? 1 : 0) + (a.ending.finalIntervalClass === b.ending.finalIntervalClass ? 1 : 0)) / 3;
+  const register = (1 - Math.min(1, Math.abs(a.range.mean - b.range.mean) / 12) + (1 - Math.min(1, Math.abs(a.range.span - b.range.span) / Math.max(a.range.span, b.range.span, 1)))) / 2;
+  const aspects = { rhythm: round(rhythm, 3), intervals: round(intervals, 3), contour: round(contour, 3), activity: round(activity, 3), ending: round(ending, 3), register: round(register, 3) };
+  const overall = (Object.keys(COMPARE_WEIGHTS) as (keyof typeof COMPARE_WEIGHTS)[]).reduce((acc, k) => acc + COMPARE_WEIGHTS[k] * aspects[k], 0);
+  const statements: string[] = [];
+  const say = (k: keyof typeof aspects, name: string) => {
+    if (aspects[k] >= 0.85) statements.push(`nearly the same ${name}`);
+    else if (aspects[k] <= 0.35) statements.push(`very different ${name}`);
+  };
+  say("rhythm", "rhythm");
+  say("intervals", "melodic intervals");
+  say("contour", "contour");
+  say("activity", "activity shape");
+  say("ending", "ending");
+  say("register", "register");
+  if (a.activityShape !== b.activityShape) statements.push(`activity: ${a.activityShape} against ${b.activityShape}`);
+  if (a.contour.kind !== b.contour.kind) statements.push(`contour: ${a.contour.kind} against ${b.contour.kind}`);
+  return { aspects, overall: round(overall, 3), relation: relateProfiles(a, b).kind, statements };
 }

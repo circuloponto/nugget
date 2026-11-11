@@ -326,7 +326,7 @@ export default function MusicalLab() {
             Musical Lab <span>phase 2</span>
           </h1>
           <p>
-            One document, three synchronized views, sample-accurate audio. <a href="/phrase">Phrase Constructor →</a> · <a href="/evaluator">Engine evaluator →</a>
+            One document, three synchronized views, sample-accurate audio. <a href="/phrase">Phrase Constructor →</a> · <a href="/corpus">Corpus Analysis →</a> · <a href="/evaluator">Engine evaluator →</a>
           </p>
         </div>
         <div className="docbar">

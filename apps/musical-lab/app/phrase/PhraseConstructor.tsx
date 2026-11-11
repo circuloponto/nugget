@@ -346,7 +346,7 @@ export default function PhraseConstructor() {
           </h1>
           <p>
             Contrasting phrases built from a grammar of targets, outlines, enclosures, runs and rhythm; inspect them note by note, then develop the one you like. <a href="/">← Musical Lab</a> ·{" "}
-            <a href="/evaluator">Engine evaluator →</a>
+            <a href="/corpus">Corpus Analysis →</a> · <a href="/evaluator">Engine evaluator →</a>
           </p>
         </div>
         <div className="docbar">
