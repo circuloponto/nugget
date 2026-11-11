@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Download, SkipBack, Pause, Play, SkipForward, Music2, SlidersHorizontal, Info, ArrowLeft, ArrowRight, Repeat, Check, X, Volume2 } from "lucide-react";
+import { IC, IC_SM } from "./ui/icons";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   buildScale,
   CYCLE_IDS,
@@ -33,6 +35,9 @@ import {
   type ScaleType,
 } from "@musical-lab/engine";
 import { ensureAudio, playChord, type PluckOptions, type PluckTone } from "./audio";
+import Modal from "./ui/Modal";
+import Tabs from "./ui/Tabs";
+import { Topbar } from "./ui/shellContext";
 import Fretboard, { type DisplayNote, type Role } from "./Fretboard";
 
 const TONICS = LETTERS.flatMap((l) => [l, `${l}b`, `${l}#`]);
@@ -93,7 +98,7 @@ const toDisplay = (f: Frame): DisplayNote[] =>
     pitch: formatPitch(n.pitch),
   }));
 
-export default function Lab() {
+export default function Lab({ active = true }: { active?: boolean }) {
   const [tonic, setTonic] = useState("C");
   const [scaleType, setScaleType] = useState<ScaleType>("major");
   const [mode, setMode] = useState<"cycle" | "voicings">("cycle");
@@ -114,6 +119,9 @@ export default function Lab() {
   const [bpm, setBpm] = useState(72);
   const [heard, setHeard] = useState("");
   const [step, setStep] = useState(0);
+  const [rtab, setRtab] = useState<"chord" | "neck" | "verdict" | "steps">("chord");
+  const [modal, setModal] = useState<null | "more" | "loop">(null);
+  const closeModal = useCallback(() => setModal(null), []);
 
   const board = useMemo(() => makeFretboard(STANDARD_TUNING, 22), []);
   const scale = useMemo(() => buildScale(tonic, scaleType), [tonic, scaleType]);
@@ -233,7 +241,7 @@ export default function Lab() {
   // Auto-play: sound each chord as it comes up, then advance after one beat. Wraps when looping,
   // otherwise stops on the last chord.
   useEffect(() => {
-    if (!playing || mode !== "cycle" || frames.length < 2) return;
+    if (!active || !playing || mode !== "cycle" || frames.length < 2) return;
     hear(frames[idx]);
     const t = setTimeout(() => {
       if (idx + 1 < frames.length) setStep(idx + 1);
@@ -242,10 +250,15 @@ export default function Lab() {
     }, chordSeconds * 1000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, mode, idx, frames, wraps, chordSeconds]);
+  }, [active, playing, mode, idx, frames, wraps, chordSeconds]);
+
+  useEffect(() => {
+    if (!active) setPlaying(false);
+  }, [active]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!active) return;
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "SELECT" || tag === "INPUT") return;
       if (e.key === "ArrowRight") move(1);
@@ -254,7 +267,7 @@ export default function Lab() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frames, idx, wraps, sound]);
+  }, [active, frames, idx, wraps, sound]);
 
   /** Download the current plan as a MusicIR JSON document. */
   const exportIR = () => {
@@ -276,343 +289,401 @@ export default function Lab() {
     : "";
 
   return (
-    <main className="lab">
-      <header>
-        <h1>Musical Lab <span>engine evaluator</span></h1>
-        <p>
-          Every note on this page comes from <code>@musical-lab/engine</code> running in your browser. Use ← → to step.
-        </p>
-      </header>
+    <div className="wb ev">
+      <Topbar active={active}>
+        {mode === "cycle" && frames.length > 1 ? (
+          <>
+            <button className="tool-btn" onClick={() => move(-1)} disabled={!wraps && idx === 0} aria-label="Previous chord" title="Previous chord (←)">
+              <SkipBack {...IC} />
+            </button>
+            <button
+              className="tool-btn primary"
+              onClick={() => {
+                if (!playing && sound) ensureAudio(); // browsers only allow sound after a click
+                setPlaying((p) => !p);
+              }}
+              aria-label={playing ? "Pause" : "Play"}
+              data-testid="ev-play"
+            >
+              {playing ? <Pause {...IC} /> : <Play {...IC} />}
+            </button>
+            <button className="tool-btn" onClick={() => move(1)} disabled={!wraps && idx === frames.length - 1} aria-label="Next chord" title="Next chord (→)">
+              <SkipForward {...IC} />
+            </button>
+            <span className="pill" title="One chord is one beat">
+              <Music2 {...IC} />
+              <input type="number" min={20} max={240} value={bpm} onChange={(e) => setBpm(clamp(Number(e.target.value), 20, 240))} aria-label="Tempo" />
+            </span>
+            <span className="pill pill-opt">
+              Chord {idx + 1} of {frames.length}
+            </span>
+          </>
+        ) : null}
+        <button className="tool-btn" onClick={() => hear(frame)} disabled={!sound || !frame} aria-label="Hear this chord again" title="Hear this chord again">
+          <Volume2 {...IC} />
+          <span className="lbl">Hear</span>
+        </button>
+        <button className="tool-btn" onClick={exportIR} disabled={!result.ir} title="Export the plan as a MusicIR document" data-testid="ev-export">
+          <Download {...IC} />
+          <span className="lbl">Export</span>
+        </button>
+        <button className="tool-btn" onClick={() => setModal("more")} aria-label="View settings" title="Fretboard, playback and sound options" data-testid="ev-more">
+          <SlidersHorizontal {...IC} />
+        </button>
+      </Topbar>
 
       {/* After a dropdown changes, hand focus back to the page: otherwise ← → keep
           editing the dropdown (changing the cycle and resetting to chord 1). */}
       <section
-        className="panel controls"
+        className="ev-controls"
         aria-label="Controls"
         onChange={(e) => {
           if (e.target instanceof HTMLSelectElement) e.target.blur();
         }}
       >
-        <label>Mode
+        <label className="field">
+          <span>Mode</span>
           <select value={mode} onChange={(e) => setMode(e.target.value as "cycle" | "voicings")}>
             <option value="cycle">Cycle (voice-led path)</option>
             <option value="voicings">All voicings of one triad</option>
           </select>
         </label>
-        <label>Key
+        <label className="field">
+          <span>Key</span>
           <select value={tonic} onChange={(e) => setTonic(e.target.value)}>
-            {TONICS.map((t) => <option key={t}>{t}</option>)}
+            {TONICS.map((t) => (
+              <option key={t}>{t}</option>
+            ))}
           </select>
         </label>
-        <label>Scale
+        <label className="field">
+          <span>Scale</span>
           <select value={scaleType} onChange={(e) => setScaleType(e.target.value as ScaleType)}>
-            {SCALE_TYPES.map((t) => <option key={t} value={t}>{SCALE_LABEL[t]}</option>)}
+            {SCALE_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {SCALE_LABEL[t]}
+              </option>
+            ))}
           </select>
         </label>
         {mode === "cycle" && (
-          <label>Cycle
+          <label className="field">
+            <span>Cycle</span>
             <select value={cycle} onChange={(e) => setCycle(Number(e.target.value))}>
-              {CYCLE_IDS.map((c) => <option key={c} value={c}>Cycle {c} (root up {c - 1})</option>)}
+              {CYCLE_IDS.map((c) => (
+                <option key={c} value={c}>
+                  Cycle {c} (root up {c - 1})
+                </option>
+              ))}
             </select>
           </label>
         )}
-        <label>{mode === "cycle" ? "Start on degree" : "Triad on degree"}
+        <label className="field">
+          <span>{mode === "cycle" ? "Start on degree" : "Triad on degree"}</span>
           <select value={degree} onChange={(e) => setDegree(Number(e.target.value))}>
-            {[1, 2, 3, 4, 5, 6, 7].map((d) => <option key={d}>{d}</option>)}
+            {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+              <option key={d}>{d}</option>
+            ))}
           </select>
         </label>
-        <label>Inversion
+        <label className="field">
+          <span>Inversion</span>
           <select value={inversion} onChange={(e) => setInversion(Number(e.target.value) as Inversion)}>
-            {INVERSION_NAMES.map((n, i) => <option key={n} value={i}>{n}</option>)}
+            {INVERSION_NAMES.map((n, i) => (
+              <option key={n} value={i}>
+                {n}
+              </option>
+            ))}
           </select>
         </label>
-        {mode === "cycle" && (
-          <>
-            {fold !== "sweep" && (
-              <label>Chords
-                <input type="number" min={1} max={90} value={length} onChange={(e) => setLength(clamp(Number(e.target.value), 1, 90))} />
-              </label>
-            )}
-            <label>Across the neck
+      </section>
+
+      <section className="wb-chords ev-chords" aria-label="Chords">
+        <span className="label">Chords</span>
+        <div className="chord-row ev-strip">
+          {mode === "cycle" && result.theory.length > 0 ? (
+            <nav className="strip" aria-label="Chords in the cycle">
+              {result.theory.map((t, i) => {
+                const f = frames[i];
+                return (
+                  <button
+                    key={i}
+                    className={["chip", i === idx && f ? "active" : "", f?.wrapped ? "wrapped" : ""].join(" ").trim()}
+                    disabled={!f}
+                    onClick={() => go(i)}
+                    title={f?.wrapped ? `wrapped to the ${descending ? "top" : "bottom"} of the neck here` : `chord ${i + 1}`}
+                  >
+                    <b>{t.roman}</b>
+                    <span>{t.symbol}</span>
+                    {f?.wrapped ? <em><Repeat {...IC_SM} /></em> : null}
+                  </button>
+                );
+              })}
+              {wraps && <span className="wrap-note" title="the circuit repeats"><Repeat {...IC_SM} /> back to {result.theory[0]!.roman}</span>}
+            </nav>
+          ) : mode === "voicings" && frames.length > 0 ? (
+            <div className="slider ev-slider">
+              <button className="btn small" onClick={() => go(Math.max(0, idx - 1))}><ArrowLeft {...IC} /></button>
+              <input type="range" min={0} max={frames.length - 1} value={idx} onChange={(e) => go(Number(e.target.value))} aria-label="Voicing" />
+              <button className="btn small" onClick={() => go(Math.min(frames.length - 1, idx + 1))}><ArrowRight {...IC} /></button>
+              <span>{idx + 1} / {frames.length}</span>
+            </div>
+          ) : (
+            <span className="hint">no chords</span>
+          )}
+        </div>
+        <div className="wb-chords-right">
+          {mode === "cycle" && frames.length > 0 && fold === "sweep" && result.info && (
+            <button className="icon-btn" onClick={() => setModal("loop")} aria-label="About this loop" title="About this loop" data-testid="ev-loop-info">
+              <Info {...IC} />
+            </button>
+          )}
+          {frame?.wrapped && <span className="badge"><Repeat {...IC_SM} /> wrapped to the {descending ? "top" : "bottom"}</span>}
+        </div>
+      </section>
+
+      <div className="wb-messages">
+        {result.error && (
+          <div className="banner error" role="alert">
+            {result.error}
+          </div>
+        )}
+      </div>
+
+      {frame ? (
+        <div className="wb-main ev-main">
+          <section className="card wb-left" aria-label="Fretboard">
+            <div className="wb-left-head">
+              <strong>
+                {formatNote(scale.tonic)} {SCALE_LABEL[scale.type].toLowerCase()}:
+              </strong>
+              <span className="muted">{scale.notes.map(formatNote).join("  ")}</span>
+            </div>
+            <div className="wb-stage">
+              <div className="stage-pane board" style={{ flex: "1 1 100%" }}>
+                <Fretboard board={board} scale={scale} frets={22} notes={toDisplay(frame)} ghost={prev ? toDisplay(prev) : []} showScale={showScale} />
+              </div>
+            </div>
+            <div className="legend-inline">
+              <i className="dot root" /> root <i className="dot third" /> third <i className="dot fifth" /> fifth {prev && (
+                <>
+                  <i className="dot ghost root" /> previous chord
+                </>
+              )}
+            </div>
+          </section>
+
+          <aside className="card wb-right ev-right" aria-label="Details">
+            <Tabs
+              label="Details"
+              value={rtab}
+              onChange={setRtab}
+              tabs={[
+                { id: "chord", label: "Chord", testId: "ev-tab-chord" },
+                { id: "neck", label: "On the neck", testId: "ev-tab-neck" },
+                { id: "verdict", label: "Verdict", testId: "ev-tab-verdict" },
+                ...(mode === "cycle" ? [{ id: "steps" as const, label: "All steps", testId: "ev-tab-steps" }] : []),
+              ]}
+            />
+            <div className="scroll-y ev-right-body">
+              {rtab === "chord" && (
+                <div>
+                  <h2 className="co2-h">
+                    {frame.triad.symbol} <small className="muted">{frame.triad.roman}</small>
+                  </h2>
+                  <dl>
+                    <dt>Quality</dt><dd>{frame.triad.quality}</dd>
+                    <dt>Chord tones</dt><dd>{frame.triad.notes.map(formatNote).join(" – ")}</dd>
+                    <dt>Inversion</dt><dd>{INVERSION_NAMES[frame.inversion]}</dd>
+                    <dt>Sounding</dt><dd>{frame.pitches.map(formatPitch).join("  ")} <small>(bass → top)</small></dd>
+                  </dl>
+                </div>
+              )}
+              {rtab === "neck" && (
+                <dl>
+                  <dt>Strings:frets</dt>
+                  <dd>{frame.guitar.map((n) => `${guitarStringNumber(board, n.string)}:${n.fret}`).join("  ")}</dd>
+                  <dt>Tab (6→1)</dt><dd><code>{tab}</code></dd>
+                  <dt>Stretch / fingers</dt><dd>{frame.span} frets / {frame.fingers}</dd>
+                  {frame.octaveShift !== undefined && (
+                    <>
+                      <dt>Octave shift</dt>
+                      <dd>{frame.octaveShift === 0 ? "none (theoretical pitch)" : `${frame.octaveShift > 0 ? "+" : ""}${frame.octaveShift} octave(s) from theory`}</dd>
+                    </>
+                  )}
+                  {frame.cost !== undefined && idx > 0 && <><dt>Cost from previous</dt><dd>{frame.cost.toFixed(1)}</dd></>}
+                  {wraps && idx === 0 && result.closing !== null && <><dt>Cost from last chord (wrap)</dt><dd>{result.closing.toFixed(1)}</dd></>}
+                </dl>
+              )}
+              {rtab === "verdict" && (
+                <div>
+                  {violations.length === 0 ? (
+                    <p className="ok"><Check {...IC_SM} /> valid under the configured constraints, with exact pitches</p>
+                  ) : (
+                    <ul className="bad">{violations.map((v, i) => <li key={i}><b>{v.code}</b> {v.message}</li>)}</ul>
+                  )}
+                  <p className="muted">
+                    An approximation: it checks string order, fret stretch, exact pitches and an estimated finger count. It does not guarantee a shape is comfortable to play.
+                  </p>
+                  {mode === "cycle" && result.cost !== null && <p className="muted">Whole {wraps ? "loop" : "path"} cost: {result.cost.toFixed(1)}</p>}
+                  {sound && heard && <p className="muted" data-testid="heard"><Volume2 {...IC_SM} /> last heard: {heard}</p>}
+                  {result.ir &&
+                    (irIssues.length === 0 ? (
+                      <p className="ok" data-testid="ir-status">
+                        <Check {...IC_SM} /> MusicIR valid · {result.ir.chords.length} chords, {result.ir.events.length} notes
+                      </p>
+                    ) : (
+                      <p className="bad" data-testid="ir-status"><X {...IC_SM} /> MusicIR has {irIssues.length} problem(s): {irIssues[0]!.message}</p>
+                    ))}
+                </div>
+              )}
+              {rtab === "steps" && mode === "cycle" && (
+                <div className="table-scroll">
+                  <table>
+                    <thead><tr><th>#</th><th>Chord</th><th>Inv.</th><th>Sounding</th><th>Tab 6→1</th><th>Shift</th><th>Cost</th></tr></thead>
+                    <tbody>
+                      {frames.map((f, i) => (
+                        <tr key={i} className={i === idx ? "sel" : ""} onClick={() => go(i)}>
+                          <td>{i + 1}</td>
+                          <td>{f.triad.roman} {f.triad.symbol}</td>
+                          <td>{f.inversion}</td>
+                          <td>{f.pitches.map(formatPitch).join(" ")}</td>
+                          <td><code>{[...board.tuning.strings.keys()].map((s) => f.guitar.find((n) => n.string === s)?.fret ?? "x").join(" ")}</code></td>
+                          <td>{f.wrapped ? <><Repeat {...IC_SM} /> wrap</> : f.octaveShift ? (f.octaveShift > 0 ? `+${f.octaveShift}` : f.octaveShift) : "–"}</td>
+                          <td>{i === 0 ? "–" : f.cost?.toFixed(1)}</td>
+                        </tr>
+                      ))}
+                      {wraps && result.closing !== null && (
+                        <tr className="wrap-row" onClick={() => go(0)}>
+                          <td><Repeat {...IC_SM} /></td>
+                          <td colSpan={5}>then back to chord 1</td>
+                          <td>{result.closing.toFixed(1)}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
+      ) : (
+        <div className="stage-empty" style={{ gridRow: "4 / 5" }}>
+          <div>
+            <b>No chords</b>
+            Change the settings above.
+          </div>
+        </div>
+      )}
+
+      <Modal open={modal === "more"} onClose={closeModal} title="Fretboard, playback and sound" size="wide" testId="ev-more-modal" footer={<button className="btn primary" onClick={closeModal}>Done</button>}>
+        <div className="form-grid">
+          {mode === "cycle" && fold !== "sweep" && (
+            <label className="field">
+              <span>Chords</span>
+              <input type="number" min={1} max={90} value={length} onChange={(e) => setLength(clamp(Number(e.target.value), 1, 90))} />
+            </label>
+          )}
+          {mode === "cycle" && (
+            <label className="field">
+              <span>Across the neck</span>
               <select value={fold} onChange={(e) => setFold(e.target.value as FoldPolicy)}>
                 <option value="sweep">Perfect loop (runs the neck, restarts)</option>
                 <option value="whole-voicing">Fold each chord to fit (smoothest)</option>
                 <option value="none">Exact pitches, no wrap (may fail)</option>
               </select>
             </label>
-            <label>Start near fret
-              <input type="number" min={0} max={22} placeholder="any" value={anchor}
-                onChange={(e) => setAnchor(e.target.value === "" ? "" : clamp(Number(e.target.value), 0, 22))} />
-            </label>
-          </>
-        )}
-        <label>Max stretch (frets)
-          <input type="number" min={0} max={6} value={maxFretSpan} onChange={(e) => setMaxFretSpan(clamp(Number(e.target.value), 0, 6))} />
-        </label>
-        <label>Highest fret
-          <input type="number" min={5} max={22} value={maxFret} onChange={(e) => setMaxFret(clamp(Number(e.target.value), 5, 22))} />
-        </label>
-        {mode === "cycle" && fold !== "sweep" && (
-          <label className="check">
-            <input type="checkbox" checked={loop} onChange={(e) => setLoop(e.target.checked)} /> Loop: last chord continues to the first
-          </label>
-        )}
-        <label className="check">
-          <input type="checkbox" checked={showScale} onChange={(e) => setShowScale(e.target.checked)} /> Show scale notes
-        </label>
-        <label className="check">
-          <input type="checkbox" checked={sound} onChange={(e) => setSound(e.target.checked)} /> Sound
-        </label>
-        <label>Tone
-          <select
-            value={tone}
-            onChange={(e) => {
-              setTone(e.target.value as PluckTone);
-              // let the new tone be heard right away, with the chord on screen
-              const next = e.target.value as PluckTone;
-              if (sound && frame) playChord(frame.guitar.map((n) => n.midi), next, next === "sine" ? shape : undefined);
-            }}
-          >
-            <option value="sine">Sine (almost a plucked sine wave)</option>
-            <option value="soft">Soft string (round, short)</option>
-            <option value="mellow">Mellow string</option>
-            <option value="bright">Bright string (the original)</option>
-          </select>
-        </label>
-        {mode === "cycle" && (
-          <label>Tempo (BPM, 1 chord = 1 beat)
-            <input type="number" min={20} max={240} value={bpm} onChange={(e) => setBpm(clamp(Number(e.target.value), 20, 240))} />
-          </label>
-        )}
-      </section>
-
-      {tone === "sine" && (
-        <section className="panel shaping" aria-label="Shape the sine sound">
-          <h2>Shape the sound <small>move a slider and the current chord replays</small></h2>
-          <div className="sliders">
-            {(
-              [
-                { key: "ringSeconds", label: "Ring (resonance)", hint: "seconds to fade out; lower = shorter", min: 0.3, max: 3, step: 0.05, show: (v: number) => `${v.toFixed(2)} s` },
-                { key: "attackSeconds", label: "Attack (pluck)", hint: "fade-in; higher = softer start", min: 0.002, max: 0.04, step: 0.001, show: (v: number) => `${Math.round(v * 1000)} ms` },
-                { key: "brightness", label: "Brightness", hint: "upper partials; 0 = pure sine", min: 0, max: 0.6, step: 0.01, show: (v: number) => v.toFixed(2) },
-                { key: "lowEnd", label: "Low-end definition", hint: "clearer low notes; 0 = off", min: 0, max: 1, step: 0.05, show: (v: number) => v.toFixed(2) },
-              ] as const
-            ).map((d) => (
-              <label key={d.key} className="slider-row">
-                <span>
-                  {d.label} <b>{d.show(shape[d.key])}</b>
-                </span>
-                <input
-                  type="range"
-                  min={d.min}
-                  max={d.max}
-                  step={d.step}
-                  value={shape[d.key]}
-                  onChange={(e) => {
-                    const next: Shape = { ...shape, [d.key]: Number(e.target.value) };
-                    setShape(next);
-                    if (sound && frame) playChord(frame.guitar.map((n) => n.midi), "sine", next as PluckOptions);
-                  }}
-                />
-                <em>{d.hint}</em>
-              </label>
-            ))}
-          </div>
-          <button className="export" onClick={() => setShape(SINE_SHAPE)}>Reset to default</button>
-        </section>
-      )}
-
-      <section className="panel scale-line">
-        <strong>{formatNote(scale.tonic)} {SCALE_LABEL[scale.type].toLowerCase()}:</strong>{" "}
-        {scale.notes.map(formatNote).join("  ")}
-      </section>
-
-      {result.error && <div className="panel error" role="alert">{result.error}</div>}
-
-      {mode === "cycle" && result.theory.length > 0 && (
-        <nav className="strip" aria-label="Chords in the cycle">
-          {result.theory.map((t, i) => {
-            const f = frames[i];
-            return (
-              <button
-                key={i}
-                className={["chip", i === idx && f ? "active" : "", f?.wrapped ? "wrapped" : ""].join(" ").trim()}
-                disabled={!f}
-                onClick={() => go(i)}
-                title={f?.wrapped ? `wrapped to the ${descending ? "top" : "bottom"} of the neck here` : `chord ${i + 1}`}
-              >
-                <b>{t.roman}</b>
-                <span>{t.symbol}</span>
-                {f?.wrapped ? <em>⟲</em> : null}
-              </button>
-            );
-          })}
-          {wraps && <span className="wrap-note" title="the circuit repeats">↻ back to {result.theory[0]!.roman}</span>}
-        </nav>
-      )}
-
-      {mode === "cycle" && frames.length > 0 && fold === "sweep" && result.info && (
-        <p className="hint">
-          <b>Perfect loop · {result.info.length} chords, {result.info.wraps} wrap{result.info.wraps === 1 ? "" : "s"} (⟲)</b>
-          {" "}Cycle {cycle} {descending ? "descends" : "ascends"}: it runs {descending ? "down from the high strings and frets toward the lowest strings" : "up from the low strings toward the highest strings and frets"},
-          changing string sets as it goes. When the next triad has no room left it wraps back to the {descending ? "top" : "bottom"} and
-          carries on with the next triad of the cycle. After chord {result.info.length} the next triad is the first one again, in the same place,
-          so the loop closes and repeats forever.
-        </p>
-      )}
-
-      {mode === "cycle" && frames.length > 1 && (
-        <div className="nav">
-          <button
-            onClick={() => {
-              if (!playing && sound) ensureAudio(); // browsers only allow sound after a click
-              setPlaying((p) => !p);
-            }}
-            aria-label={playing ? "Pause" : "Play"}
-          >
-            {playing ? "⏸ Pause" : "▶ Play"}
-          </button>
-          <button onClick={() => move(-1)} disabled={!wraps && idx === 0} aria-label="Previous chord">← Prev</button>
-          <button
-            onClick={() => move(1)}
-            disabled={!wraps && idx === frames.length - 1}
-            title={!wraps && idx === frames.length - 1 ? "Last chord. Turn on Loop to continue to the first." : undefined}
-            aria-label="Next chord"
-          >
-            Next →
-          </button>
-          <button onClick={() => hear(frame)} disabled={!sound} aria-label="Hear this chord again">🔊 Hear</button>
-          <span>
-            Chord {idx + 1} of {frames.length}
-            {frame?.wrapped && <span className="badge">⟲ wrapped to the {descending ? "top" : "bottom"} of the neck</span>}
-            {wraps && idx === frames.length - 1 && <span className="badge">next wraps to chord 1</span>}
-            {wraps && idx === 0 && <span className="badge">arrived by wrapping from chord {frames.length}</span>}
-          </span>
-        </div>
-      )}
-
-      {mode === "voicings" && frames.length > 0 && (
-        <div className="panel slider">
-          <button onClick={() => go(Math.max(0, idx - 1))}>←</button>
-          <input type="range" min={0} max={frames.length - 1} value={idx} onChange={(e) => go(Number(e.target.value))} />
-          <button onClick={() => go(Math.min(frames.length - 1, idx + 1))}>→</button>
-          <span>{idx + 1} / {frames.length}</span>
-        </div>
-      )}
-
-      {frame && (
-        <>
-          <section className="panel">
-            <Fretboard
-              board={board}
-              scale={scale}
-              frets={maxFret}
-              notes={toDisplay(frame)}
-              ghost={prev ? toDisplay(prev) : []}
-              showScale={showScale}
-            />
-            <div className="legend">
-              <span><i className="dot root" /> root</span>
-              <span><i className="dot third" /> third</span>
-              <span><i className="dot fifth" /> fifth</span>
-              {prev && <span><i className="dot ghost root" /> previous chord</span>}
-            </div>
-          </section>
-
-          <section className="panel details">
-            <div>
-              <h2>{frame.triad.symbol} <small>{frame.triad.roman}</small></h2>
-              <dl>
-                <dt>Quality</dt><dd>{frame.triad.quality}</dd>
-                <dt>Chord tones</dt><dd>{frame.triad.notes.map(formatNote).join(" – ")}</dd>
-                <dt>Inversion</dt><dd>{INVERSION_NAMES[frame.inversion]}</dd>
-                <dt>Sounding</dt><dd>{frame.pitches.map(formatPitch).join("  ")} <small>(bass → top)</small></dd>
-              </dl>
-            </div>
-            <div>
-              <h2>On the neck</h2>
-              <dl>
-                <dt>Strings:frets</dt>
-                <dd>{frame.guitar.map((n) => `${guitarStringNumber(board, n.string)}:${n.fret}`).join("  ")}</dd>
-                <dt>Tab (6→1)</dt><dd><code>{tab}</code></dd>
-                <dt>Stretch / fingers</dt><dd>{frame.span} frets / {frame.fingers}</dd>
-                {frame.octaveShift !== undefined && (
-                  <>
-                    <dt>Octave shift</dt>
-                    <dd>{frame.octaveShift === 0 ? "none (theoretical pitch)" : `${frame.octaveShift > 0 ? "+" : ""}${frame.octaveShift} octave(s) from theory`}</dd>
-                  </>
-                )}
-                {frame.cost !== undefined && idx > 0 && <><dt>Cost from previous</dt><dd>{frame.cost.toFixed(1)}</dd></>}
-                {wraps && idx === 0 && result.closing !== null && (
-                  <><dt>Cost from last chord (wrap)</dt><dd>{result.closing.toFixed(1)}</dd></>
-                )}
-              </dl>
-            </div>
-            <div>
-              <h2>Engine verdict</h2>
-              {violations.length === 0 ? (
-                <p className="ok">✓ valid under the configured constraints, with exact pitches</p>
-              ) : (
-                <ul className="bad">{violations.map((v, i) => <li key={i}><b>{v.code}</b> {v.message}</li>)}</ul>
-              )}
-              <p className="muted">
-                An approximation: it checks string order, fret stretch, exact pitches and an estimated finger count.
-                It does not guarantee a shape is comfortable to play.
-              </p>
-              {mode === "cycle" && result.cost !== null && (
-                <p className="muted">Whole {wraps ? "loop" : "path"} cost: {result.cost.toFixed(1)}</p>
-              )}
-              {sound && heard && <p className="muted" data-testid="heard">🔊 last heard: {heard}</p>}
-              {result.ir && (
-                <>
-                  {irIssues.length === 0 ? (
-                    <p className="ok" data-testid="ir-status">
-                      ✓ MusicIR valid · {result.ir.chords.length} chords, {result.ir.events.length} notes
-                    </p>
-                  ) : (
-                    <p className="bad" data-testid="ir-status">✗ MusicIR has {irIssues.length} problem(s): {irIssues[0]!.message}</p>
-                  )}
-                  <button className="export" onClick={exportIR}>⬇ Export MusicIR (JSON)</button>
-                </>
-              )}
-            </div>
-          </section>
-
-          {mode === "cycle" && (
-            <section className="panel">
-              <h2>All steps</h2>
-              <div className="table-scroll">
-                <table>
-                  <thead><tr><th>#</th><th>Chord</th><th>Inv.</th><th>Sounding</th><th>Tab 6→1</th><th>Shift</th><th>Cost</th></tr></thead>
-                  <tbody>
-                    {frames.map((f, i) => (
-                      <tr key={i} className={i === idx ? "sel" : ""} onClick={() => go(i)}>
-                        <td>{i + 1}</td>
-                        <td>{f.triad.roman} {f.triad.symbol}</td>
-                        <td>{f.inversion}</td>
-                        <td>{f.pitches.map(formatPitch).join(" ")}</td>
-                        <td><code>{[...board.tuning.strings.keys()].map((s) => f.guitar.find((n) => n.string === s)?.fret ?? "x").join(" ")}</code></td>
-                        <td>{f.wrapped ? "⟲ wrap" : f.octaveShift ? (f.octaveShift > 0 ? `+${f.octaveShift}` : f.octaveShift) : "–"}</td>
-                        <td>{i === 0 ? "–" : f.cost?.toFixed(1)}</td>
-                      </tr>
-                    ))}
-                    {wraps && result.closing !== null && (
-                      <tr className="wrap-row" onClick={() => go(0)}>
-                        <td>↻</td>
-                        <td colSpan={5}>
-                          then back to chord 1{fold === "sweep" ? " (the next triad of the cycle is the first one again, in the same place: loop repeats)" : " (string-set change / octave fold happens here if needed)"}
-                        </td>
-                        <td>{result.closing.toFixed(1)}</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </section>
           )}
-        </>
-      )}
-    </main>
+          {mode === "cycle" && (
+            <label className="field">
+              <span>Start near fret</span>
+              <input type="number" min={0} max={22} placeholder="any" value={anchor} onChange={(e) => setAnchor(e.target.value === "" ? "" : clamp(Number(e.target.value), 0, 22))} />
+            </label>
+          )}
+          <label className="field">
+            <span>Max stretch (frets)</span>
+            <input type="number" min={0} max={6} value={maxFretSpan} onChange={(e) => setMaxFretSpan(clamp(Number(e.target.value), 0, 6))} />
+          </label>
+          <label className="field">
+            <span>Highest fret</span>
+            <input type="number" min={5} max={22} value={maxFret} onChange={(e) => setMaxFret(clamp(Number(e.target.value), 5, 22))} />
+          </label>
+          <label className="field">
+            <span>Tone</span>
+            <select
+              value={tone}
+              onChange={(e) => {
+                setTone(e.target.value as PluckTone);
+                const next = e.target.value as PluckTone;
+                if (sound && frame) playChord(frame.guitar.map((n) => n.midi), next, next === "sine" ? shape : undefined);
+              }}
+            >
+              <option value="sine">Sine (almost a plucked sine wave)</option>
+              <option value="soft">Soft string (round, short)</option>
+              <option value="mellow">Mellow string</option>
+              <option value="bright">Bright string (the original)</option>
+            </select>
+          </label>
+          <div className="span-all deg-grid">
+            {mode === "cycle" && fold !== "sweep" && (
+              <label>
+                <input type="checkbox" checked={loop} onChange={(e) => setLoop(e.target.checked)} /> Loop: last chord continues to the first
+              </label>
+            )}
+            <label>
+              <input type="checkbox" checked={showScale} onChange={(e) => setShowScale(e.target.checked)} /> Show scale notes
+            </label>
+            <label>
+              <input type="checkbox" checked={sound} onChange={(e) => setSound(e.target.checked)} /> Sound
+            </label>
+          </div>
+          {tone === "sine" && (
+            <div className="span-all">
+              <h3>Shape the sound <small className="muted">move a slider and the current chord replays</small></h3>
+              <div className="sliders">
+                {(
+                  [
+                    { key: "ringSeconds", label: "Ring (resonance)", hint: "seconds to fade out; lower = shorter", min: 0.3, max: 3, step: 0.05, show: (v: number) => `${v.toFixed(2)} s` },
+                    { key: "attackSeconds", label: "Attack (pluck)", hint: "fade-in; higher = softer start", min: 0.002, max: 0.04, step: 0.001, show: (v: number) => `${Math.round(v * 1000)} ms` },
+                    { key: "brightness", label: "Brightness", hint: "upper partials; 0 = pure sine", min: 0, max: 0.6, step: 0.01, show: (v: number) => v.toFixed(2) },
+                    { key: "lowEnd", label: "Low-end definition", hint: "clearer low notes; 0 = off", min: 0, max: 1, step: 0.05, show: (v: number) => v.toFixed(2) },
+                  ] as const
+                ).map((d) => (
+                  <label key={d.key} className="slider-row">
+                    <span>
+                      {d.label} <b>{d.show(shape[d.key])}</b>
+                    </span>
+                    <input
+                      type="range"
+                      min={d.min}
+                      max={d.max}
+                      step={d.step}
+                      value={shape[d.key]}
+                      onChange={(e) => {
+                        const next: Shape = { ...shape, [d.key]: Number(e.target.value) };
+                        setShape(next);
+                        if (sound && frame) playChord(frame.guitar.map((n) => n.midi), "sine", next as PluckOptions);
+                      }}
+                    />
+                    <em>{d.hint}</em>
+                  </label>
+                ))}
+              </div>
+              <button className="btn small" onClick={() => setShape(SINE_SHAPE)}>Reset to default</button>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      <Modal open={modal === "loop" && !!result.info} onClose={closeModal} title="About this loop" size="narrow" testId="ev-loop-modal">
+        {result.info && (
+          <p>
+            <b>Perfect loop · {result.info.length} chords, {result.info.wraps} wrap{result.info.wraps === 1 ? "" : "s"} (<Repeat {...IC_SM} />)</b>
+            {" "}Cycle {cycle} {descending ? "descends" : "ascends"}: it runs {descending ? "down from the high strings and frets toward the lowest strings" : "up from the low strings toward the highest strings and frets"}, changing string sets as it goes. When the next triad has no room left it wraps back to the {descending ? "top" : "bottom"} and carries on with the next triad of the cycle. After chord {result.info.length} the next triad is the first one again, in the same place, so the loop closes and repeats forever.
+          </p>
+        )}
+      </Modal>
+    </div>
   );
 }
 

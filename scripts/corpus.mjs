@@ -72,7 +72,7 @@ write("import-report.json", {
 write("index.json", {
   notice: `${result.corpus.name}: ${result.corpus.license}. ${result.corpus.usage}`,
   corpus: result.corpus,
-  pieces: result.pieces.map((p) => ({ id: p.piece.id, title: p.piece.title, category: p.piece.provenance.catalog.category ?? "", meter: p.piece.measures[0].meter.text, bars: p.piece.measures.length, notes: p.report.counts.notes, status: p.report.status })),
+  pieces: result.pieces.map((p) => ({ id: p.piece.id, title: p.piece.title, category: p.piece.provenance.catalog.category ?? "", meter: p.piece.measures[0].meter.text, bars: p.piece.measures.length, notes: p.report.counts.notes, status: p.report.status, ir: p.ir !== null })),
   failed: result.failed.map((f) => ({ id: f.id, title: f.title, reasons: f.report.issues.filter((i) => i.severity === "error").map((i) => `${i.code}: ${i.message}`) })),
 });
 

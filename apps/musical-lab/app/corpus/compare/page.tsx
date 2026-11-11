@@ -1,7 +1,7 @@
-import ComparisonView from "./ComparisonView";
+import AppShell from "../../ui/AppShell";
 
-export const metadata = { title: "Generator against the corpus — Musical Lab" };
+export const metadata = { title: "Generator against the corpus — Nugget" };
 
 export default function ComparePage() {
-  return <ComparisonView />;
+  return <AppShell initial="compare" />;
 }

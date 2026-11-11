@@ -1,5 +1,5 @@
-import MusicalLab from "./lab/MusicalLab";
+import AppShell from "./ui/AppShell";
 
 export default function Home() {
-  return <MusicalLab />;
+  return <AppShell initial="workbench" />;
 }

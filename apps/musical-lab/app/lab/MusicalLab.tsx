@@ -1,5 +1,7 @@
 "use client";
 
+import { FolderOpen, Save as SaveIcon, SkipBack, Pause, Play, Square, SkipForward, Music2, SlidersHorizontal, Check, X } from "lucide-react";
+import { IC, IC_SM } from "../ui/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildCycleProgressionIR,
@@ -41,6 +43,9 @@ import { LabPlayer } from "./player";
 import ProgressionStrip from "./ProgressionStrip";
 import RhythmEditor from "./RhythmEditor";
 import Timeline from "./Timeline";
+import Modal from "../ui/Modal";
+import Tabs from "../ui/Tabs";
+import { Topbar } from "../ui/shellContext";
 
 const TONICS = LETTERS.flatMap((l) => [l, `${l}b`, `${l}#`]);
 const SCALE_LABEL: Record<ScaleType, string> = { major: "Major", naturalMinor: "Natural minor", harmonicMinor: "Harmonic minor" };
@@ -59,7 +64,7 @@ const INITIAL: Params = { tonic: "C", scale: "major", cycle: 5, degree: 1, inver
 
 const clamp = (n: number, lo: number, hi: number) => (Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : lo);
 
-export default function MusicalLab() {
+export default function MusicalLab({ active = true }: { active?: boolean }) {
   const playerRef = useRef<LabPlayer | null>(null);
   const playheadRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -79,6 +84,10 @@ export default function MusicalLab() {
   const [readout, setReadout] = useState("");
   const [pxPerSecond, setPxPerSecond] = useState(90);
   const [audioInfo, setAudioInfo] = useState({ ms: 0, state: "none", busy: false });
+  const [stage, setStage] = useState<"timeline" | "board" | "both">("both");
+  const [rtab, setRtab] = useState<"rhythm" | "document">("rhythm");
+  const [modal, setModal] = useState<null | "settings">(null);
+  const closeModal = useCallback(() => setModal(null), []);
 
   // ── the audio transport ───────────────────────────────────────────────────
   useEffect(() => {
@@ -87,6 +96,13 @@ export default function MusicalLab() {
     setSampleRate(p.sampleRate);
     return () => p.dispose();
   }, []);
+
+  useEffect(() => {
+    if (!active) {
+      playerRef.current?.pause();
+      setPlaying(false);
+    }
+  }, [active]);
 
   // ── the document: generated from the parameters, or loaded from a file ────
   const built = useMemo(
@@ -319,107 +335,25 @@ export default function MusicalLab() {
   const lockedGenerator = loaded !== null;
 
   return (
-    <main className="lab lab2">
-      <header className="lab2-head">
-        <div>
-          <h1>
-            Musical Lab <span>phase 2</span>
-          </h1>
-          <p>
-            One document, three synchronized views, sample-accurate audio. <a href="/phrase">Phrase Constructor →</a> · <a href="/corpus">Corpus Analysis →</a> · <a href="/evaluator">Engine evaluator →</a>
-          </p>
-        </div>
-        <div className="docbar">
-          <button onClick={save} disabled={!doc}>
-            ⬇ Save MusicIR
-          </button>
-          <button onClick={() => fileRef.current?.click()}>⬆ Load MusicIR…</button>
-          <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(e) => void onFile(e.target.files?.[0])} data-testid="file" />
-        </div>
-      </header>
-
-      {loadIssues.length > 0 && (
-        <div className="panel error" role="alert" data-testid="load-error">
-          <b>That file is not a valid MusicIR document, so nothing was loaded.</b> {loadIssues.length} problem{loadIssues.length === 1 ? "" : "s"}:
-          <ul>
-            {loadIssues.slice(0, 8).map((i, k) => (
-              <li key={k}>
-                <code>{i.path || "(document)"}</code> {i.message}
-              </li>
-            ))}
-          </ul>
-          {loadIssues.length > 8 && <small>…and {loadIssues.length - 8} more</small>}
-        </div>
-      )}
-
-      <section className={lockedGenerator ? "panel controls locked" : "panel controls"} aria-label="Progression" onChange={(e) => e.target instanceof HTMLSelectElement && e.target.blur()}>
-        <label>
-          Key
-          <select value={params.tonic} disabled={lockedGenerator} onChange={(e) => setParam("tonic", e.target.value)}>
-            {TONICS.map((t) => (
-              <option key={t}>{t}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Scale
-          <select value={params.scale} disabled={lockedGenerator} onChange={(e) => setParam("scale", e.target.value as ScaleType)}>
-            {SCALE_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {SCALE_LABEL[t]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Cycle
-          <select value={params.cycle} disabled={lockedGenerator} onChange={(e) => setParam("cycle", Number(e.target.value))}>
-            {CYCLE_IDS.map((c) => (
-              <option key={c} value={c}>
-                Cycle {c} (root up {c - 1})
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Start on degree
-          <select value={params.degree} disabled={lockedGenerator} onChange={(e) => setParam("degree", Number(e.target.value))}>
-            {[1, 2, 3, 4, 5, 6, 7].map((d) => (
-              <option key={d}>{d}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Inversion
-          <select value={params.inversion} disabled={lockedGenerator} onChange={(e) => setParam("inversion", Number(e.target.value) as Inversion)}>
-            {INVERSION_NAMES.map((n, i) => (
-              <option key={n} value={i}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Chords
-          <select
-            value={String(params.chords)}
-            disabled={lockedGenerator}
-            onChange={(e) => setParam("chords", e.target.value === "loop" ? "loop" : (Number(e.target.value) as 7 | 14))}
-          >
-            <option value="7">7 (one pass of the cycle)</option>
-            <option value="14">14</option>
-            <option value="loop">The whole perfect loop</option>
-          </select>
-        </label>
-        <label>
-          Chord length
-          <select value={params.chordBeats} disabled={lockedGenerator} onChange={(e) => setParam("chordBeats", Number(e.target.value))}>
-            <option value={2}>2 beats</option>
-            <option value={4}>1 bar (4 beats)</option>
-          </select>
-        </label>
-        <label>
-          Tempo (BPM)
+    <div className="wb lab3 lab2-frame">
+      <Topbar active={active}>
+        <button className="tool-btn" onClick={() => seekChord(activeIndex - 1)} aria-label="Previous chord" title="Previous chord" disabled={!doc}>
+          <SkipBack {...IC} />
+        </button>
+        <button className="tool-btn primary" onClick={() => void toggle()} aria-label={playing ? "Pause" : "Play"} disabled={!doc} data-testid="lab-play">
+          {playing ? <Pause {...IC} /> : <Play {...IC} />}
+        </button>
+        <button className="tool-btn" onClick={stop} aria-label="Stop and rewind" title="Stop and rewind" disabled={!doc}>
+          <Square {...IC} />
+        </button>
+        <button className="tool-btn" onClick={() => seekChord(activeIndex + 1)} aria-label="Next chord" title="Next chord" disabled={!doc}>
+          <SkipForward {...IC} />
+        </button>
+        <span className="pill pill-opt" data-testid="readout" title="Where the playhead is">
+          {readout || "bar 1 · beat 1.0"} · <b>{chordView?.chord.symbol ?? "—"}</b>
+        </span>
+        <span className="pill" title="Tempo (beats per minute)">
+          <Music2 {...IC} />
           <input
             type="number"
             min={40}
@@ -429,120 +363,230 @@ export default function MusicalLab() {
               setParam("bpm", clamp(Number(e.target.value), 40, 200));
               setBpmTouched(true);
             }}
+            aria-label="Tempo"
+            data-testid="lab-bpm"
           />
-        </label>
-        <label>
-          Tone
-          <select value={tone} onChange={(e) => setTone(e.target.value as PluckTone)}>
-            <option value="sine">Sine</option>
-            <option value="soft">Soft string</option>
-            <option value="mellow">Mellow string</option>
-            <option value="bright">Bright string</option>
+        </span>
+        <button className="tool-btn" onClick={() => fileRef.current?.click()} title="Open a MusicIR document" data-testid="lab-open">
+          <FolderOpen {...IC} />
+          <span className="lbl">Open</span>
+        </button>
+        <button className="tool-btn" onClick={save} disabled={!doc} title="Save this document as MusicIR" data-testid="lab-save">
+          <SaveIcon {...IC} />
+          <span className="lbl">Save</span>
+        </button>
+        <button className="tool-btn" onClick={() => setModal("settings")} aria-label="View settings" title="View settings" data-testid="lab-settings">
+          <SlidersHorizontal {...IC} />
+        </button>
+        <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(e) => void onFile(e.target.files?.[0])} data-testid="file" />
+      </Topbar>
+
+      <section className="wb-controls lab3-controls" aria-label="Progression" onChange={(e) => e.target instanceof HTMLSelectElement && e.target.blur()}>
+        <label className="field">
+          <span>Key</span>
+          <select value={params.tonic} disabled={lockedGenerator} onChange={(e) => setParam("tonic", e.target.value)}>
+            {TONICS.map((t) => (
+              <option key={t}>{t}</option>
+            ))}
           </select>
         </label>
-        {lockedGenerator && (
-          <div className="loaded-note">
-            Showing <b>{loaded.name}</b>. The progression controls are off because the notes come from the file; the rhythm and tempo can still be edited.{" "}
-            <button onClick={regenerate}>Back to generated progression</button>
-          </div>
-        )}
+        <label className="field">
+          <span>Scale</span>
+          <select value={params.scale} disabled={lockedGenerator} onChange={(e) => setParam("scale", e.target.value as ScaleType)}>
+            {SCALE_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {SCALE_LABEL[t]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Cycle</span>
+          <select value={params.cycle} disabled={lockedGenerator} onChange={(e) => setParam("cycle", Number(e.target.value))}>
+            {CYCLE_IDS.map((c) => (
+              <option key={c} value={c}>
+                Cycle {c} (root up {c - 1})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Start on degree</span>
+          <select value={params.degree} disabled={lockedGenerator} onChange={(e) => setParam("degree", Number(e.target.value))}>
+            {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+              <option key={d}>{d}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Inversion</span>
+          <select value={params.inversion} disabled={lockedGenerator} onChange={(e) => setParam("inversion", Number(e.target.value) as Inversion)}>
+            {INVERSION_NAMES.map((n, i) => (
+              <option key={n} value={i}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Chords</span>
+          <select value={String(params.chords)} disabled={lockedGenerator} onChange={(e) => setParam("chords", e.target.value === "loop" ? "loop" : (Number(e.target.value) as 7 | 14))}>
+            <option value="7">7 (one pass of the cycle)</option>
+            <option value="14">14</option>
+            <option value="loop">The whole perfect loop</option>
+          </select>
+        </label>
+        <label className="field">
+          <span>Chord length</span>
+          <select value={params.chordBeats} disabled={lockedGenerator} onChange={(e) => setParam("chordBeats", Number(e.target.value))}>
+            <option value={2}>2 beats</option>
+            <option value={4}>1 bar (4 beats)</option>
+          </select>
+        </label>
       </section>
 
-      {built && !built.ok && (
-        <div className="panel error" role="alert">
-          {built.reason}
-        </div>
-      )}
+      <div className="wb-messages">
+        {loadIssues.length > 0 && (
+          <div className="banner error" role="alert" data-testid="load-error">
+            <b>That file is not a valid MusicIR document, so nothing was loaded.</b> {loadIssues.length} problem{loadIssues.length === 1 ? "" : "s"}: {loadIssues.slice(0, 4).map((i) => `${i.path || "(document)"} ${i.message}`).join(" · ")}
+            {loadIssues.length > 4 ? ` …and ${loadIssues.length - 4} more` : ""}
+          </div>
+        )}
+        {built && !built.ok && (
+          <div className="banner error" role="alert">
+            {built.reason}
+          </div>
+        )}
+        {lockedGenerator && (
+          <div className="banner">
+            Showing <b>{loaded.name}</b>. The progression controls are off because the notes come from the file; the rhythm and tempo can still be edited.
+            <button className="btn small" onClick={regenerate}>Back to generated progression</button>
+          </div>
+        )}
+      </div>
 
-      {doc && schedule && tempo && (
+      {doc && schedule && tempo ? (
         <>
-          <section className="panel transport" aria-label="Transport">
-            <button className="play" onClick={() => void toggle()} aria-label={playing ? "Pause" : "Play"}>
-              {playing ? "⏸ Pause" : "▶ Play"}
-            </button>
-            <button onClick={stop} aria-label="Stop and rewind">
-              ⏹ Rewind
-            </button>
-            <button onClick={() => seekChord(activeIndex - 1)} aria-label="Previous chord">
-              ◀ chord
-            </button>
-            <button onClick={() => seekChord(activeIndex + 1)} aria-label="Next chord">
-              chord ▶
-            </button>
-            <span className="readout" data-testid="readout">
-              {readout || "bar 1 · beat 1.0"} · <b>{chordView?.chord.symbol ?? "—"}</b>
-            </span>
-            <label className="zoom">
-              Zoom
-              <input type="range" min={30} max={260} value={pxPerSecond} onChange={(e) => setPxPerSecond(Number(e.target.value))} />
-            </label>
-            <span className="muted" data-testid="audio-info">
-              {audioInfo.busy ? "rendering…" : `loop ${(schedule.totalFrames / sampleRate).toFixed(1)} s · ${sampleRate} Hz · ${audioInfo.state}`}
-            </span>
-          </section>
-
-          <ProgressionStrip chords={doc.chords} activeIndex={activeIndex} closed={doc.relations.some((r) => r.data?.closing === true)} onSeek={seekChord} />
-
-          <section className="panel">
-            <Timeline
-              ir={doc}
-              schedule={schedule}
-              tempo={tempo}
-              gridSteps={gridSteps}
-              pxPerSecond={pxPerSecond}
-              activeIndex={activeIndex}
-              playheadRef={playheadRef}
-              scrollRef={scrollRef}
-              onSeek={seekFrame}
-            />
-            <div className="legend">
-              <span>
-                <i className="dot root" /> root
+          <section className="wb-chords" aria-label="Progression">
+            <span className="label">Chords</span>
+            <div className="chord-row lab3-chords">
+              <ProgressionStrip chords={doc.chords} activeIndex={activeIndex} closed={doc.relations.some((r) => r.data?.closing === true)} onSeek={seekChord} />
+            </div>
+            <div className="wb-chords-right">
+              <span className="pill" data-testid="audio-info" title="The loop, the sample rate and the audio state">
+                {audioInfo.busy ? "rendering…" : `loop ${(schedule.totalFrames / sampleRate).toFixed(1)} s · ${audioInfo.state}`}
               </span>
-              <span>
-                <i className="dot third" /> third
-              </span>
-              <span>
-                <i className="dot fifth" /> fifth
-              </span>
-              <span className="muted">dashed lines are the rhythm’s own grid ({gridSteps} per chord); solid are beats and bars; click to move the playhead</span>
             </div>
           </section>
 
-          <section className="panel">
-            {hasPositions ? (
-              <>
-                <Fretboard board={board} scale={fretScale} frets={17} notes={sounding} ghost={silent} showScale={fretScale !== undefined} />
-                <div className="legend">
-                  <span>
-                    <b>{chordView?.chord.symbol}</b>
-                    {chordView?.chord.roman ? ` (${chordView.chord.roman})` : ""} · filled = sounding now · rings = in the chord, not sounding
+          <div className="wb-main lab3-main">
+            <section className="card wb-left" aria-label="Views">
+              <div className="wb-left-head">
+                <Tabs
+                  label="Lab view"
+                  value={stage}
+                  onChange={setStage}
+                  tabs={[
+                    { id: "timeline", label: "Timeline", testId: "lab-tab-timeline" },
+                    { id: "board", label: "Fretboard", testId: "lab-tab-board" },
+                    { id: "both", label: "Both", testId: "lab-tab-both" },
+                  ]}
+                />
+                <div className="wb-toolbar">
+                  <span className="legend-inline">
+                    <i className="dot root" /> root <i className="dot third" /> third <i className="dot fifth" /> fifth
                   </span>
+                  {stage !== "board" && (
+                    <label>
+                      Zoom <input type="range" min={30} max={260} value={pxPerSecond} onChange={(e) => setPxPerSecond(Number(e.target.value))} aria-label="Zoom" />
+                    </label>
+                  )}
                 </div>
-              </>
-            ) : (
-              <p className="muted">This document has no fretted positions, so there is nothing to draw on the fretboard.</p>
-            )}
-          </section>
+              </div>
+              <div className="wb-stage">
+                {stage !== "board" && (
+                  <div className="stage-pane roll">
+                    <Timeline ir={doc} schedule={schedule} tempo={tempo} gridSteps={gridSteps} pxPerSecond={pxPerSecond} activeIndex={activeIndex} playheadRef={playheadRef} scrollRef={scrollRef} onSeek={seekFrame} />
+                    <p className="hint" style={{ marginTop: 6 }}>dashed lines are the rhythm’s own grid ({gridSteps} per chord); solid are beats and bars; click to move the playhead</p>
+                  </div>
+                )}
+                {stage !== "timeline" && (
+                  <div className="stage-pane board">
+                    {hasPositions ? (
+                      <>
+                        <Fretboard board={board} scale={fretScale} frets={22} notes={sounding} ghost={silent} showScale={fretScale !== undefined} />
+                        <p className="hint" style={{ marginTop: 6 }}>
+                          <b>{chordView?.chord.symbol}</b>
+                          {chordView?.chord.roman ? ` (${chordView.chord.roman})` : ""} · filled = sounding now · rings = in the chord, not sounding
+                        </p>
+                      </>
+                    ) : (
+                      <p className="hint">This document has no fretted positions, so there is nothing to draw on the fretboard.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </section>
 
-          <RhythmEditor rhythm={rhythm} onChange={editRhythm} />
-
-          <section className="panel docinfo" aria-label="Document">
-            {issues.length === 0 ? (
-              <p className="ok" data-testid="doc-status">
-                ✓ valid MusicIR · {doc.chords.length} chords · {noteCount} notes · tempo {doc.tempo ? fnum(parseFraction(doc.tempo.bpm)) : "—"} BPM · every fret position checked against its pitch and tuning
-              </p>
-            ) : (
-              <p className="bad" data-testid="doc-status">
-                ✗ {issues.length} problem(s): {issues[0]!.message}
-              </p>
-            )}
-            <p className="muted">
-              Save writes exactly this document. Load accepts a file only if it passes the same checks, structure first and then meaning (frets against pitches and tuning, chord labels against notes).
-            </p>
-          </section>
+            <aside className="card wb-right lab3-right" aria-label="Rhythm and document">
+              <Tabs
+                label="Rhythm and document"
+                value={rtab}
+                onChange={setRtab}
+                tabs={[
+                  { id: "rhythm", label: "Rhythm", testId: "lab-tab-rhythm" },
+                  { id: "document", label: "Document", testId: "lab-tab-document" },
+                ]}
+              />
+              <div className="scroll-y lab3-right-body">
+                {rtab === "rhythm" && <RhythmEditor rhythm={rhythm} onChange={editRhythm} />}
+                {rtab === "document" && (
+                  <section aria-label="Document">
+                    {issues.length === 0 ? (
+                      <p className="ok" data-testid="doc-status">
+                        <Check {...IC_SM} /> valid MusicIR · {doc.chords.length} chords · {noteCount} notes · tempo {doc.tempo ? fnum(parseFraction(doc.tempo.bpm)) : "—"} BPM · every fret position checked against its pitch and tuning
+                      </p>
+                    ) : (
+                      <p className="bad" data-testid="doc-status">
+                        <X {...IC_SM} /> {issues.length} problem(s): {issues[0]!.message}
+                      </p>
+                    )}
+                    <p className="hint">Save writes exactly this document. Open accepts a file only if it passes the same checks, structure first and then meaning (frets against pitches and tuning, chord labels against notes).</p>
+                  </section>
+                )}
+              </div>
+            </aside>
+          </div>
         </>
+      ) : (
+        <div className="stage-empty" style={{ gridRow: "3 / 5" }}>
+          <div>
+            <b>No progression</b>
+            Choose a key, scale and cycle.
+          </div>
+        </div>
       )}
-    </main>
+
+      <Modal open={modal === "settings"} onClose={closeModal} title="Settings" size="narrow" testId="lab-settings-modal" footer={<button className="btn primary" onClick={closeModal}>Done</button>}>
+        <div className="form-grid">
+          <label className="field span-all">
+            <span>Tone</span>
+            <select value={tone} onChange={(e) => setTone(e.target.value as PluckTone)} data-testid="lab-tone">
+              <option value="sine">Sine</option>
+              <option value="soft">Soft string</option>
+              <option value="mellow">Mellow string</option>
+              <option value="bright">Bright string</option>
+            </select>
+          </label>
+          <label className="field span-all">
+            <span>
+              Timeline zoom <b>{pxPerSecond}</b> px per second
+            </span>
+            <input type="range" min={30} max={260} value={pxPerSecond} onChange={(e) => setPxPerSecond(Number(e.target.value))} />
+          </label>
+          <p className="hint span-all">Tempo is in the top bar; the progression controls are under it.</p>
+        </div>
+      </Modal>
+    </div>
   );
 }

@@ -21,6 +21,10 @@ export class LabPlayer {
   private running = false;
   /** Frame to resume from while stopped. */
   private resting = 0;
+  /** Loop (the default, as the Lab needs) or play once and stop. */
+  private loopOn = true;
+  /** Optional region [from, to) in frames; playback is confined to it. */
+  private region: { from: number; to: number } | null = null;
 
   /** Counters for diagnostics (exposed as window.__labPlayer in development). */
   readonly stats = { starts: 0, loads: 0 };
@@ -66,11 +70,52 @@ export class LabPlayer {
     return this.total > 0 ? ((Math.floor(frame) % this.total) + this.total) % this.total : 0;
   }
 
+  /** The frames playback is confined to: the region (clipped to the audio) or the whole buffer. */
+  private range(): { from: number; to: number } {
+    const r = this.region;
+    if (!r) return { from: 0, to: this.total };
+    const from = Math.max(0, Math.min(Math.floor(r.from), this.total));
+    const to = Math.max(from, Math.min(Math.floor(r.to), this.total));
+    return to > from ? { from, to } : { from: 0, to: this.total };
+  }
+
+  /**
+   * Loop or play once, optionally inside a region (frames). With no region and looping this is the Lab's original
+   * behaviour. If it is playing it carries on from the current position when that is still inside the region.
+   */
+  setMode(loop: boolean, region: { from: number; to: number } | null): void {
+    const was = this.running ? this.position() : this.resting;
+    this.loopOn = loop;
+    this.region = region;
+    const r = this.range();
+    this.resting = was >= r.from && was < r.to ? was : r.from;
+    if (this.running) this.start(this.resting);
+  }
+
+  /** A one-shot reached its end: stop and return to the start of the range. */
+  private finish(): void {
+    this.running = false;
+    this.source = null;
+    this.gain = null;
+    this.resting = this.range().from;
+  }
+
   /** Current position in frames: from the audio clock while playing, else where it stopped. */
   position(): number {
     if (!this.running || !this.ctx) return this.resting;
     const elapsed = (this.ctx.currentTime - this.startAt - this.latency()) * this.ctx.sampleRate;
-    return this.wrap(this.startFrame + Math.max(0, elapsed));
+    const raw = Math.floor(this.startFrame + Math.max(0, elapsed));
+    const r = this.range();
+    if (!this.loopOn) {
+      if (raw >= r.to) {
+        this.finish();
+        return this.resting;
+      }
+      return raw;
+    }
+    if (!this.region) return this.wrap(raw);
+    const len = r.to - r.from;
+    return r.from + ((((raw - r.from) % len) + len) % len);
   }
 
   /**
@@ -93,6 +138,8 @@ export class LabPlayer {
   private start(frame: number): void {
     const ctx = this.context;
     if (!this.buffer) return;
+    const r = this.range();
+    if (frame < r.from || frame >= r.to) frame = r.from;
     const now = ctx.currentTime;
     const when = now + 0.02; // a fixed, exact audio-clock start time
     this.fadeOut(now, when);
@@ -102,11 +149,12 @@ export class LabPlayer {
     gain.gain.linearRampToValueAtTime(1, when + 0.008);
     const src = ctx.createBufferSource();
     src.buffer = this.buffer;
-    src.loop = true;
-    src.loopStart = 0;
-    src.loopEnd = this.total / ctx.sampleRate;
+    src.loop = this.loopOn;
+    src.loopStart = r.from / ctx.sampleRate;
+    src.loopEnd = r.to / ctx.sampleRate;
     src.connect(gain).connect(ctx.destination);
-    src.start(when, frame / ctx.sampleRate);
+    if (this.loopOn) src.start(when, frame / ctx.sampleRate);
+    else src.start(when, frame / ctx.sampleRate, (r.to - frame) / ctx.sampleRate); // once, to the end of the range
 
     this.source = src;
     this.gain = gain;

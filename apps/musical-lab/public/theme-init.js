@@ -1,0 +1,1 @@
+try{var d=document.documentElement,t=localStorage.getItem('nugget-theme');if(t==='yellow'||t==='bw'||t==='hc')d.dataset.theme=t;var c=JSON.parse(localStorage.getItem('nugget-colors')||'{}')[d.dataset.theme]||{};for(var k in c){if(/^[a-z]+$/.test(k)&&/^#[0-9a-f]{6}$/i.test(c[k]))d.style.setProperty('--'+k,c[k])}}catch(e){}

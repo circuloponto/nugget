@@ -27,8 +27,8 @@ interface Props {
   onSeek: (frame: number) => void;
 }
 
-const ROW = 11;
-const TOP = 28;
+const ROW = 9;
+const TOP = 22;
 
 /**
  * Piano-roll of the phrase on an exact time axis. Every rectangle sits on the frame the scheduler

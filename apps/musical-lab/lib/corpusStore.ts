@@ -2,8 +2,8 @@
  * Server-side access to the imported corpus (data/corpus/normalized/<corpus-id>/).
  *
  * The corpus is GPL-3.0 research data that is deliberately not part of the app bundle or the repository, so it is
- * read from disk at request time, and only for requests that come from this machine. A deployed copy of the app
- * therefore cannot serve it. File names come only from the validated catalogue, never from the request.
+ * read from disk at request time. It is served only in development (or when NUGGET_ALLOW_CORPUS=1 is set), only to
+ * this machine, and the dev and start scripts bind to 127.0.0.1. A deployed copy of the app therefore cannot serve it. File names come only from the validated catalogue, never from the request.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -25,11 +25,56 @@ export function corpusRoot(): string | null {
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
 
-/** True only when the request's own Host header names this machine. */
-export function isLocalRequest(request: Request): boolean {
-  const host = (request.headers.get("host") ?? new URL(request.url).host).toLowerCase();
-  const name = host.startsWith("[") ? host.slice(0, host.indexOf("]") + 1) : host.split(":")[0]!;
-  return LOCAL_HOSTS.has(name);
+/**
+ * Next adds its own x-forwarded-* headers to every request (x-forwarded-for carries the socket's address), so their
+ * mere presence proves nothing. What does show a proxy or tunnel: a Forwarded / X-Real-IP header, a forwarded host
+ * that differs from Host, or any non-loopback address in x-forwarded-for (a proxy's entry comes first).
+ */
+const LOOPBACK_ADDR = /^(127\.\d+\.\d+\.\d+|::1|::ffff:127\.\d+\.\d+\.\d+|\[::1\])$/i;
+function passedThroughProxy(request: Request, host: string): boolean {
+  const h = request.headers;
+  if (h.has("forwarded") || h.has("x-real-ip")) return true;
+  const fwdHost = h.get("x-forwarded-host");
+  if (fwdHost && fwdHost.toLowerCase() !== host.toLowerCase()) return true;
+  const fwdFor = h.get("x-forwarded-for");
+  if (fwdFor && fwdFor.split(",").some((a) => !LOOPBACK_ADDR.test(a.trim()))) return true;
+  return false;
+}
+
+export type CorpusAccess = { readonly ok: true } | { readonly ok: false; readonly status: number; readonly reason: string };
+
+/**
+ * Whether this request may read the research corpus. Three independent conditions, all required:
+ *
+ *  1. Production builds never serve it unless NUGGET_ALLOW_CORPUS=1 is set explicitly. A deployed or commercial copy
+ *     of the app therefore has no corpus endpoint at all by default.
+ *  2. The request must not have passed through a proxy or tunnel (forwarding headers), and its Host (and Origin, if
+ *     any) must name this machine.
+ *  3. The real boundary is the server's network binding: `npm run dev` and `npm start` listen on 127.0.0.1 only
+ *     (see package.json). The Host header is client-supplied, so check 2 is a second layer, not the boundary.
+ */
+export function corpusAccess(request: Request): CorpusAccess {
+  if (process.env.NODE_ENV === "production" && process.env.NUGGET_ALLOW_CORPUS !== "1") {
+    return { ok: false, status: 403, reason: "The corpus is disabled in production builds (it is research-only GPL-3.0 data). Set NUGGET_ALLOW_CORPUS=1 to enable it on a private machine." };
+  }
+  const nameOf = (hostPort: string): string => {
+    const h = hostPort.toLowerCase();
+    return h.startsWith("[") ? h.slice(0, h.indexOf("]") + 1) : h.split(":")[0]!;
+  };
+  const host = request.headers.get("host") ?? new URL(request.url).host;
+  if (passedThroughProxy(request, host)) return { ok: false, status: 403, reason: "The corpus is not served through a proxy or tunnel." };
+  if (!LOCAL_HOSTS.has(nameOf(host))) return { ok: false, status: 403, reason: "The corpus is served only to this machine." };
+  const origin = request.headers.get("origin");
+  if (origin) {
+    let originHost = "";
+    try {
+      originHost = new URL(origin).host;
+    } catch {
+      /* an unparsable Origin is refused below */
+    }
+    if (!LOCAL_HOSTS.has(nameOf(originHost))) return { ok: false, status: 403, reason: "The corpus is served only to pages on this machine." };
+  }
+  return { ok: true };
 }
 
 function readJson(path: string): unknown {

@@ -35,12 +35,12 @@ interface Props {
   onSeek: (wholeNotes: number) => void;
 }
 
-const CHORD_H = 20;
-const BAR_H = 22;
-const PHRASE_H = 24;
+const CHORD_H = 18;
+const BAR_H = 18;
+const PHRASE_H = 20;
 const ROW = 7;
 const ROLL_TOP = CHORD_H + BAR_H + PHRASE_H + 8;
-const DENS_H = 54;
+const DENS_H = 40;
 
 function TimelineView({ line, harmony, segments, boundaries, faint, selectedSegment, selectedNote, selectedBoundary, highlight, sounding, pxPerQuarter, playheadRef, scrollRef, onSelectNote, onSelectSegment, onSelectBoundary, onSeek }: Props) {
   const ppw = pxPerWhole(pxPerQuarter);
@@ -99,7 +99,7 @@ function TimelineView({ line, harmony, segments, boundaries, faint, selectedSegm
                 <rect x={x0} y={ROLL_TOP - 4} width={Math.max(1, x1 - x0)} height={rollH + 8} className={`co-seg ${i % 2 ? "odd" : ""}${selectedSegment === i ? " sel" : ""}`} />
                 <rect x={x0} y={CHORD_H + BAR_H + 2} width={Math.max(1, x1 - x0 - 1)} height={PHRASE_H - 4} rx={4} className={`co-seg-head ${selectedSegment === i ? "sel" : ""}`} data-segment={s.id} />
                 <text x={x0 + 6} y={CHORD_H + BAR_H + 17} className="co-seg-label">
-                  {s.id} <tspan className="co-seg-conf">{Math.round(s.confidence * 100)}%</tspan>
+                  {s.id} <tspan className="co-seg-conf"><title>boundary strength (heuristic, uncalibrated)</title>{Math.round(s.confidence * 100)}%</tspan>
                 </text>
               </g>
             );

@@ -1,5 +1,7 @@
 "use client";
 
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { IC, IC_SM } from "../ui/icons";
 import {
   RHYTHM_GRIDS,
   RHYTHM_MODES,
@@ -122,10 +124,10 @@ export default function RhythmEditor({ rhythm, onChange }: Props) {
 
       <div className="rhythm-bottom">
         <button onClick={() => set(rotateSteps(steps, -1))} title="shift the pattern earlier by one step">
-          ◀ rotate
+          <ChevronLeft {...IC_SM} /> rotate
         </button>
         <button onClick={() => set(rotateSteps(steps, 1))} title="shift the pattern later by one step">
-          rotate ▶
+          rotate <ChevronRight {...IC_SM} />
         </button>
         <button onClick={() => set(steps.map(() => "rest"))}>clear</button>
         <span className="muted">

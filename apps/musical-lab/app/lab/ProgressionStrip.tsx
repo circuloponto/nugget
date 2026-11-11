@@ -1,5 +1,7 @@
 "use client";
 
+import { Repeat } from "lucide-react";
+import { IC, IC_SM } from "../ui/icons";
 import type { IRChordSegment } from "@musical-lab/engine";
 
 interface Props {
@@ -27,7 +29,7 @@ export default function ProgressionStrip({ chords, activeIndex, closed, onSeek }
           <i>{c.inversion ? `/${c.inversion}` : ""}</i>
         </button>
       ))}
-      {closed && <span className="prog-loop" title="The last chord leads straight back into the first">↻</span>}
+      {closed && <span className="prog-loop" title="The last chord leads straight back into the first"><Repeat {...IC_SM} /></span>}
     </nav>
   );
 }

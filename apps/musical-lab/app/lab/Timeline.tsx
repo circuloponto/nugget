@@ -27,8 +27,8 @@ interface Props {
   onSeek: (frame: number) => void;
 }
 
-const ROW = 9; // px per semitone
-const TOP = 26; // chord band
+const ROW = 8; // px per semitone
+const TOP = 22; // chord band
 const COLORS = { root: "var(--brass)", third: "var(--ink)", fifth: "var(--stone)", none: "var(--stone)" } as const;
 
 /**

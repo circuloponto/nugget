@@ -1,4 +1,4 @@
-import { isLocalRequest, listCorpus, loadComparison, loadPiece } from "../../../lib/corpusStore";
+import { corpusAccess, listCorpus, loadComparison, loadPiece } from "../../../lib/corpusStore";
 
 export const dynamic = "force-dynamic";
 
@@ -9,10 +9,12 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
  * GET /api/corpus?piece=<id>       one piece: notation record, MusicIR, analysis
  * GET /api/corpus?comparison=1     the generator-against-corpus comparison (npm run compare)
  *
- * Local only: the corpus is GPL-3.0 research data that is not shipped with the app.
+ * Development and this machine only: the corpus is GPL-3.0 research data that is not shipped with the app. Disabled in
+ * production builds unless NUGGET_ALLOW_CORPUS=1 (see corpusAccess).
  */
 export function GET(request: Request) {
-  if (!isLocalRequest(request)) return json({ available: false, reason: "The corpus is served only to this machine (it is research-only GPL-3.0 data)." }, 403);
+  const access = corpusAccess(request);
+  if (!access.ok) return json({ available: false, reason: access.reason }, access.status);
   const listing = listCorpus();
   if (!listing) {
     return json({ available: false, reason: "No corpus has been imported yet. Run: npm run corpus -- data/corpus/incoming/nugget_folk_starter.zip" });

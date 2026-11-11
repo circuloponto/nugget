@@ -1,5 +1,7 @@
 "use client";
 
+import { FolderOpen, Save as SaveIcon, SkipBack, Pause, Play, Square, Music2, SlidersHorizontal, ChevronDown, ChevronRight, ChevronLeft, Info, EllipsisVertical } from "lucide-react";
+import { IC, IC_SM } from "../ui/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   analyzeMelody,
@@ -11,6 +13,7 @@ import {
   editPhraseNote,
   explorePhrases,
   formatPitch,
+  fnum,
   frac,
   fstr,
   generationSpaceFromRequest,
@@ -18,11 +21,13 @@ import {
   LENGTHS,
   makeFretboard,
   makeTuning,
+  midi,
   parseFraction,
   parseMusicIR,
   parsePhraseRequest,
   phraseToIR,
   PLUCK_TONES,
+  progressionFor,
   renderDocument,
   RHYTHM_CHARACTERS,
   scheduleFrames,
@@ -43,6 +48,9 @@ import {
 import Fretboard, { type DisplayNote, type Role } from "../Fretboard";
 import { LabPlayer } from "../lab/player";
 import PhraseRoll, { noteKind } from "./PhraseRoll";
+import Modal from "../ui/Modal";
+import Tabs from "../ui/Tabs";
+import { Topbar } from "../ui/shellContext";
 
 const TONICS = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 const DURATIONS = ["1/16", "1/12", "1/8", "3/16", "1/6", "1/4", "3/8", "1/2", "3/4", "1"];
@@ -76,13 +84,13 @@ function describeStep(step: { op: string; params: Readonly<Record<string, unknow
 }
 
 /** "explore all" or one value: the UI form of a dimension of the generation space. */
-function Dim<T extends string>({ label, value, options, onChange, testid }: { label: string; value: readonly T[] | "all"; options: readonly { id: T; name: string }[]; onChange: (v: readonly T[] | "all") => void; testid: string }) {
+function Dim<T extends string>({ label, value, options, onChange, testid, all = "explore all" }: { label: string; value: readonly T[] | "all"; options: readonly { id: T; name: string }[]; onChange: (v: readonly T[] | "all") => void; testid: string; all?: string }) {
   const current = value === "all" || value.length !== 1 ? "" : value[0]!;
   return (
-    <label>
-      {label}
+    <label className="field">
+      <span>{label}</span>
       <select value={current} onChange={(e) => onChange(e.target.value === "" ? "all" : [e.target.value as T])} data-testid={testid}>
-        <option value="">explore all</option>
+        <option value="">{all}</option>
         {options.map((o) => (
           <option key={o.id} value={o.id}>
             {o.name}
@@ -93,7 +101,7 @@ function Dim<T extends string>({ label, value, options, onChange, testid }: { la
   );
 }
 
-export default function PhraseConstructor() {
+export default function PhraseConstructor({ active = true }: { active?: boolean }) {
   const playerRef = useRef<LabPlayer | null>(null);
   const playheadRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -121,6 +129,13 @@ export default function PhraseConstructor() {
   const [openScore, setOpenScore] = useState<string | null>(null);
   const [audioMs, setAudioMs] = useState(0);
   const [locks, setLocks] = useState<LockAspect[]>(["target"]);
+  const [stage, setStage] = useState<"roll" | "board" | "both">("both");
+  const [modal, setModal] = useState<null | "space" | "develop" | "inspect" | "analysis" | "stats" | "detail" | "settings">(null);
+  const [spaceTab, setSpaceTab] = useState<"targets" | "melody" | "constraints" | "results">("targets");
+  const [analysisTab, setAnalysisTab] = useState<"construction" | "analysis">("construction");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [chordIdx, setChordIdx] = useState(-1);
+  const closeModal = useCallback(() => setModal(null), []);
 
   const targets = useMemo(() => targetOptions(req.tonic, req.mode), [req.tonic, req.mode]);
   const e = req.exploration;
@@ -133,6 +148,13 @@ export default function PhraseConstructor() {
     setSampleRate(p.sampleRate);
     return () => p.dispose();
   }, []);
+
+  useEffect(() => {
+    if (!active) {
+      playerRef.current?.pause();
+      setPlaying(false);
+    }
+  }, [active]);
 
   const schedule = useMemo(() => (ir ? scheduleFrames(ir, sampleRate) : null), [ir, sampleRate]);
 
@@ -172,6 +194,8 @@ export default function PhraseConstructor() {
           lastKey = key;
           setSounding(now);
         }
+        const ci = p.isPlaying ? schedule.chords.findIndex((c) => frame >= c.startFrame && frame < c.endFrame) : -1;
+        setChordIdx((prev) => (prev === ci ? prev : ci));
         if (p.isPlaying !== playing) setPlaying(p.isPlaying);
       }
       raf = requestAnimationFrame(tick);
@@ -333,159 +357,144 @@ export default function PhraseConstructor() {
   const regLo = req.register[0];
   const regHi = req.register[1];
   const set = (patch: Partial<PhraseRequest>) => setReq((r) => ({ ...r, ...patch }));
+  const prog = useMemo(() => progressionFor(req.tonic, req.mode), [req.tonic, req.mode]);
+  const targetChoice = e.mode === "focus" ? `focus:${e.focusDegree}` : "explore";
+  const onTarget = (v: string) => (v === "explore" ? setE({ mode: "explore" }) : setE({ mode: "focus", focusDegree: v.slice(6) }));
+  const hasLocks = !!(e.locks && Object.keys(e.locks).length > 0);
+  const lockText = [
+    e.locks?.targetPitch !== undefined ? `target pitch ${midiName(e.locks.targetPitch)}` : null,
+    e.locks?.rhythmPlan ? "rhythm (every onset and length)" : null,
+    e.locks?.contourShape !== undefined ? `contour shape ${e.locks.contourShape || "(none)"}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  /** Tempo applies at once: the document's own tempo changes, so the audio re-renders from the same position. */
+  const setTempo = (bpm: number) => {
+    set({ bpm });
+    setIr((cur) => (cur && cur.tempo ? { ...cur, tempo: { ...cur.tempo, bpm: String(bpm) } } : cur));
+  };
   const exploreAllDegrees = e.degrees === "all";
   const naturalDegrees = targets.options.filter((o) => o.kind !== "alteration").map((o) => o.degree);
   const activeDegrees = exploreAllDegrees ? naturalDegrees : (e.degrees as readonly string[]);
 
   return (
-    <main className="lab lab2 ph">
-      <header className="lab2-head">
-        <div>
-          <h1>
-            Phrase Constructor <span>phase 3</span>
-          </h1>
-          <p>
-            Contrasting phrases built from a grammar of targets, outlines, enclosures, runs and rhythm; inspect them note by note, then develop the one you like. <a href="/">← Musical Lab</a> ·{" "}
-            <a href="/corpus">Corpus Analysis →</a> · <a href="/evaluator">Engine evaluator →</a>
-          </p>
-        </div>
-        <div className="docbar">
-          <button onClick={save} disabled={!ir}>
-            ⬇ Save MusicIR
-          </button>
-          <button onClick={() => fileRef.current?.click()}>⬆ Load MusicIR…</button>
-          <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(ev) => void onFile(ev.target.files?.[0])} data-testid="ph-file" />
-        </div>
-      </header>
+    <div className="wb">
+      <Topbar active={active}>
+        <button className="tool-btn" onClick={rewind} aria-label="Back to the start" title="Back to the start" disabled={!ir}>
+          <SkipBack {...IC} />
+        </button>
+        <button className="tool-btn primary" onClick={() => void toggle()} aria-label={playing ? "Pause" : "Play"} disabled={!ir} data-testid="ph-play">
+          {playing ? <Pause {...IC} /> : <Play {...IC} />}
+        </button>
+        <button className="tool-btn" onClick={rewind} aria-label="Stop and rewind" title="Stop" disabled={!ir}>
+          <Square {...IC} />
+        </button>
+        <span className="pill" title="Tempo (quarter notes per minute)">
+          <Music2 {...IC} />
+          <input type="number" min={50} max={200} value={req.bpm} onChange={(ev) => setTempo(Math.max(50, Math.min(200, Number(ev.target.value) || 100)))} aria-label="Tempo" data-testid="ph-bpm" />
+        </span>
+        <span className="pill pill-opt" title="The harmony is a ii–V–I, one bar per chord">
+          4/4
+        </span>
+        <span className="pill pill-opt muted" data-testid="ph-audio" title="rendering time of the audio">
+          {ir ? `${audioMs} ms` : "—"}
+        </span>
+        <button className="tool-btn" onClick={() => fileRef.current?.click()} title="Open a MusicIR document" data-testid="ph-open">
+          <FolderOpen {...IC} />
+          <span className="lbl">Open</span>
+        </button>
+        <button className="tool-btn" onClick={save} disabled={!ir} title="Save the phrase as a MusicIR document" data-testid="ph-save">
+          <SaveIcon {...IC} />
+          <span className="lbl">Save</span>
+        </button>
+        <button className="tool-btn" onClick={() => setModal("settings")} aria-label="View settings" title="View settings" data-testid="ph-settings">
+          <SlidersHorizontal {...IC} />
+        </button>
+        <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(ev) => void onFile(ev.target.files?.[0])} data-testid="ph-file" />
+      </Topbar>
 
-      {loadError.length > 0 && (
-        <div className="panel error" role="alert" data-testid="ph-load-error">
-          <b>That file is not usable, so nothing was loaded.</b>
-          <ul>
-            {loadError.slice(0, 8).map((i, k) => (
-              <li key={k}>
-                <code>{i.path || "(document)"}</code> {i.message}
-              </li>
+      <section className="wb-controls" aria-label="Phrase request">
+        <label className="field">
+          <span>Key</span>
+          <select value={req.tonic} onChange={(ev) => set({ tonic: ev.target.value })} data-testid="ph-key">
+            {TONICS.map((t) => (
+              <option key={t}>{t}</option>
             ))}
-          </ul>
-        </div>
-      )}
-
-      <section className="panel ph-controls" aria-label="Phrase request">
-        <fieldset>
-          <legend>1 · Harmony</legend>
-          <label>
-            Key
-            <select value={req.tonic} onChange={(ev) => set({ tonic: ev.target.value })}>
-              {TONICS.map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Mode
-            <select value={req.mode} onChange={(ev) => set({ mode: ev.target.value as "major" | "minor" })}>
-              <option value="major">major ii–V–I</option>
-              <option value="minor">minor ii–V–i</option>
-            </select>
-          </label>
-          <label>
-            Tempo <b>{req.bpm}</b>
-            <input type="range" min={50} max={200} value={req.bpm} onChange={(ev) => set({ bpm: Number(ev.target.value) })} />
-          </label>
-        </fieldset>
-
-        <fieldset>
-          <legend>2 · Target (on {targets.chord})</legend>
-          <label>
-            Mode
-            <select value={e.mode} onChange={(ev) => setE({ mode: ev.target.value as "explore" | "focus" })} data-testid="ph-mode">
-              <option value="explore">Explore: every compatible target</option>
-              <option value="focus">Focus: lock one target</option>
-            </select>
-          </label>
-          {e.mode === "focus" ? (
-            <label>
-              Arrive on
-              <select value={e.focusDegree} onChange={(ev) => setE({ focusDegree: ev.target.value })} data-testid="ph-target">
-                {targets.options.map((o) => (
-                  <option key={o.degree} value={o.degree}>
-                    {o.degree} · {o.note} · {o.role}
-                    {o.kind === "alteration" ? " (alteration)" : o.kind === "extension" ? " (extension)" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <div className="ph-degrees" data-testid="ph-degrees">
-              {targets.options.map((o) => (
-                <label key={o.degree} className="check" title={`${o.role}${o.kind === "chord-tone" ? "" : ` (${o.kind})`}`}>
-                  <input
-                    type="checkbox"
-                    checked={activeDegrees.includes(o.degree)}
-                    onChange={(ev) => {
-                      const next = ev.target.checked ? [...activeDegrees, o.degree] : activeDegrees.filter((d) => d !== o.degree);
-                      setE({ degrees: next.length === 0 ? "all" : next });
-                    }}
-                  />
-                  {o.note}
-                  <small>{o.degree}</small>
-                </label>
-              ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Scale / mode</span>
+          <select value={req.mode} onChange={(ev) => set({ mode: ev.target.value as "major" | "minor" })} data-testid="ph-scale">
+            <option value="major">major ii–V–I</option>
+            <option value="minor">minor ii–V–i</option>
+          </select>
+        </label>
+        <label className="field">
+          <span>Target on {targets.chord}</span>
+          <select value={targetChoice} onChange={(ev) => onTarget(ev.target.value)} data-testid="ph-target">
+            <option value="explore">Explore every target</option>
+            {targets.options.map((o) => (
+              <option key={o.degree} value={`focus:${o.degree}`}>
+                Focus: {o.note} · {o.role}
+                {o.kind === "alteration" ? " (alt)" : o.kind === "extension" ? " (ext)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Dim label="Strategy" value={e.strategies} options={STRATEGIES.map((s) => ({ id: s.id, name: s.name }))} onChange={(v) => setE({ strategies: v })} testid="ph-strategies" all="Explore all" />
+        <Dim label="Rhythm" value={e.rhythms} options={RHYTHM_CHARACTERS.map((r) => ({ id: r.id, name: r.name }))} onChange={(v) => setE({ rhythms: v })} testid="ph-rhythms" all="Explore all" />
+        <Dim label="Density" value={e.densities} options={DENSITIES.map((d) => ({ id: d, name: d }))} onChange={(v) => setE({ densities: v })} testid="ph-densities" all="Explore all" />
+        <div className="split">
+          <button className="main" onClick={generate} disabled={busy} data-testid="ph-generate">
+            {busy ? "Exploring…" : e.mode === "explore" ? "Explore" : "Generate"}
+          </button>
+          <button className="caret" onClick={() => setMenuOpen((o) => !o)} aria-label="More generate options" aria-expanded={menuOpen} data-testid="ph-generate-menu">
+            <ChevronDown {...IC} />
+          </button>
+          {menuOpen && (
+            <div className="menu" role="menu" onMouseLeave={() => setMenuOpen(false)}>
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  newSeed();
+                }}
+                disabled={busy || candidates.length === 0}
+                data-testid="ph-newseed"
+              >
+                Another set (next seed)
+              </button>
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setModal("space");
+                }}
+                data-testid="ph-space-open"
+              >
+                Generation space…
+              </button>
             </div>
           )}
-          <Dim label="Octave" value={e.bands} options={BAND_NAMES.map((b) => ({ id: b, name: `${b} register` }))} onChange={(v) => setE({ bands: v })} testid="ph-bands" />
-        </fieldset>
+        </div>
+      </section>
 
-        <fieldset>
-          <legend>3 · Melody</legend>
-          <Dim label="Melodic strategy" value={e.strategies} options={STRATEGIES.map((s) => ({ id: s.id, name: s.name }))} onChange={(v) => setE({ strategies: v })} testid="ph-strategies" />
-          <Dim label="Contour" value={e.contours} options={CONTOUR_CHOICES.filter((c) => c !== "any").map((c) => ({ id: c, name: c }))} onChange={(v) => setE({ contours: v })} testid="ph-contours" />
-          <Dim label="Phrase length" value={e.lengths} options={LENGTHS.map((l) => ({ id: l, name: l === "short" ? "short (2 beats)" : l === "standard" ? "standard (1 bar)" : "long (1½ bars, two chords)" }))} onChange={(v) => setE({ lengths: v })} testid="ph-lengths" />
-        </fieldset>
-
-        <fieldset>
-          <legend>4 · Rhythm</legend>
-          <Dim label="Rhythmic character" value={e.rhythms} options={RHYTHM_CHARACTERS.map((r) => ({ id: r.id, name: r.name }))} onChange={(v) => setE({ rhythms: v })} testid="ph-rhythms" />
-          <Dim label="Density" value={e.densities} options={DENSITIES.map((d) => ({ id: d, name: d }))} onChange={(v) => setE({ densities: v })} testid="ph-densities" />
-        </fieldset>
-
-        <fieldset>
-          <legend>Constraints</legend>
-          <label>
-            Lowest note
-            <select value={regLo} onChange={(ev) => set({ register: [Math.min(Number(ev.target.value), regHi), regHi] })}>
-              {REGISTER.map((m) => (
-                <option key={m} value={m}>
-                  {midiName(m)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Highest note
-            <select value={regHi} onChange={(ev) => set({ register: [regLo, Math.max(Number(ev.target.value), regLo)] })}>
-              {REGISTER.map((m) => (
-                <option key={m} value={m}>
-                  {midiName(m)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Largest leap <b>{req.maxLeap}</b> semitones
-            <input type="range" min={2} max={14} value={req.maxLeap} onChange={(ev) => set({ maxLeap: Number(ev.target.value) })} />
-          </label>
-          <label>
-            Highest fret <b>{req.maxFret}</b>
-            <input type="range" min={5} max={22} value={req.maxFret} onChange={(ev) => set({ maxFret: Number(ev.target.value) })} />
-          </label>
-        </fieldset>
-
-        <fieldset>
-          <legend>Results</legend>
-          <label>
-            Contrasting phrases (at most)
+      <section className="wb-chords" aria-label="Harmony">
+        <span className="label">Chords</span>
+        <div className="chord-row" data-testid="ph-chords">
+          {prog.map((p, i) => (
+            <div key={i} className={`chord-chip${chordIdx === i ? " active" : ""}${i === prog.length - 1 ? " target" : ""}`} title={i === prog.length - 1 ? "the chord the phrase arrives on" : p.roman}>
+              <b>{p.chord.symbol}</b>
+              <small>
+                | {i + 1} · {p.roman}
+              </small>
+            </div>
+          ))}
+        </div>
+        <div className="wb-chords-right">
+          <Dim label="Length" value={e.lengths} options={LENGTHS.map((l) => ({ id: l, name: l === "short" ? "2 beats" : l === "standard" ? "1 bar" : "1½ bars" }))} onChange={(v) => setE({ lengths: v })} testid="ph-lengths" all="Any" />
+          <label className="field">
+            <span>Variations</span>
             <select value={e.count} onChange={(ev) => setE({ count: Number(ev.target.value) })} data-testid="ph-count">
               {COUNTS.map((n) => (
                 <option key={n} value={n}>
@@ -494,303 +503,539 @@ export default function PhraseConstructor() {
               ))}
             </select>
           </label>
-          <label>
-            Seed
-            <input type="number" min={0} value={e.seed} onChange={(ev) => setE({ seed: Math.max(0, Math.floor(Number(ev.target.value) || 0)) })} data-testid="ph-seed" />
-          </label>
-        </fieldset>
+          <button className="tool-btn" onClick={() => setModal("space")} aria-label="Generation space" title="All the dimensions and constraints" data-testid="ph-space">
+            <SlidersHorizontal {...IC} />
+          </button>
+        </div>
+      </section>
 
-        {e.locks && Object.keys(e.locks).length > 0 && (
-          <div className="ph-active-locks" data-testid="ph-active-locks">
-            <b>Locked from the phrase you developed:</b>{" "}
-            {[
-              e.locks.targetPitch !== undefined ? `target pitch ${midiName(e.locks.targetPitch)}` : null,
-              e.locks.rhythmPlan ? "rhythm (every onset and length)" : null,
-              e.locks.contourShape !== undefined ? `contour shape ${e.locks.contourShape || "(none)"}` : null,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-            . Every exploration keeps these until you clear them.{" "}
-            <button onClick={() => setE({ locks: undefined })} data-testid="ph-clear-locks">
+      <div className="wb-messages">
+        {loadError.length > 0 && (
+          <div className="banner error" role="alert" data-testid="ph-load-error">
+            <b>That file is not usable, so nothing was loaded.</b> {loadError.slice(0, 4).map((i) => `${i.path || "(document)"}: ${i.message}`).join(" · ")}
+          </div>
+        )}
+        {failure && (
+          <div className="banner error" role="alert" data-testid="ph-failure">
+            {failure}
+          </div>
+        )}
+        {note && (
+          <p className="banner" data-testid="ph-transform-note">
+            {note}
+          </p>
+        )}
+        {loaded && ir && (
+          <div className="banner" data-testid="ph-loaded">
+            Showing <b>{loaded.name}</b>. You can inspect, analyse and edit its notes. Exploring again uses the controls above.
+          </div>
+        )}
+        {hasLocks && (
+          <div className="banner" data-testid="ph-active-locks">
+            <b>Locked from the phrase you developed:</b> {lockText}. Every exploration keeps these until you clear them.
+            <button className="btn small" onClick={() => setE({ locks: undefined })} data-testid="ph-clear-locks">
               Clear locks
             </button>
           </div>
         )}
+      </div>
 
-        <div className="ph-go">
-          <button className="play" onClick={generate} disabled={busy} data-testid="ph-generate">
-            {busy ? "Exploring…" : e.mode === "explore" ? "Explore" : "Generate"}
-          </button>
-          <button onClick={newSeed} disabled={busy || candidates.length === 0} data-testid="ph-newseed">
-            Another set (next seed)
-          </button>
-          <span className="muted">
-            Same settings and seed always give the same phrases. A dimension set to “explore all” is varied across its values; pick one to lock it. Fewer phrases are returned rather than near-duplicates.
-          </span>
-        </div>
-      </section>
+      <div className="wb-main">
+        <section className="card wb-left" aria-label="Phrase">
+          <div className="wb-left-head">
+            <Tabs
+              label="Phrase view"
+              value={stage}
+              onChange={setStage}
+              tabs={[
+                { id: "roll", label: "Roll", testId: "ph-tab-roll" },
+                { id: "board", label: "Fretboard", testId: "ph-tab-board" },
+                { id: "both", label: "Both", testId: "ph-tab-both" },
+              ]}
+            />
+            <div className="wb-toolbar">
+              {sel && (
+                <span className="sel-note" data-testid="ph-selected">
+                  <b>{sel.pitch.name}</b> selected
+                  <button className="btn small" onClick={() => setModal("inspect")} data-testid="ph-inspect-open">
+                    Inspect <ChevronRight {...IC_SM} />
+                  </button>
+                </span>
+              )}
+              {stage !== "board" && (
+                <label>
+                  Zoom <input type="range" min={40} max={300} value={pxPerSecond} onChange={(ev) => setPxPerSecond(Number(ev.target.value))} aria-label="Zoom" />
+                </label>
+              )}
+            </div>
+          </div>
+          {!ir || !schedule ? (
+            <div className="stage-empty" data-testid="ph-empty">
+              <div>
+                <b>No phrase yet</b>
+                Choose a key and what to explore, then press Explore. Every result is verified before it is shown, and the same settings and seed always give the same phrases.
+              </div>
+            </div>
+          ) : (
+            <div className="wb-stage">
+              {stage !== "board" && (
+                <div className="stage-pane roll">
+                  <div className="ph-legend">
+                    <i className="ph-note ph-target" /> target arrival <i className="ph-note ph-outline" /> chord outline <i className="ph-note ph-embellish" /> approach / enclosure / run <i className="ph-note ph-bass" /> bass root
+                  </div>
+                  <PhraseRoll ir={ir} schedule={schedule} pxPerSecond={pxPerSecond} selected={selected} melodyVoice={MELODY} playheadRef={playheadRef} scrollRef={scrollRef} onSelect={setSelected} onSeek={(f) => playerRef.current?.seek(f)} />
+                </div>
+              )}
+              {stage !== "roll" && (
+                <div className="stage-pane board">
+                  <Fretboard board={board} frets={22} notes={fretNotes} ghost={fretGhost.filter((g) => !fretNotes.some((n) => n.string === g.string && n.fret === g.fret))} showScale={false} />
+                </div>
+              )}
+            </div>
+          )}
+        </section>
 
-      {failure && (
-        <div className="panel error" role="alert" data-testid="ph-failure">
-          {failure}
-        </div>
-      )}
-      {note && (
-        <p className="panel ph-note" data-testid="ph-transform-note">
-          {note}
-        </p>
-      )}
-
-      {candidates.length > 0 && stats && (
-        <section className="panel" aria-label="Candidates">
-          <h2>
-            {candidates.length} contrasting phrase{candidates.length === 1 ? "" : "s"} <small>seed {stats.seed}</small>
-          </h2>
-          <p className="muted ph-stats" data-testid="ph-stats">
-            {stats.intentionsTried} intentions tried, {stats.intentionsReachable} reachable → {stats.poolSize} phrases, all verified ({stats.rejectedInvalid} rejected) → {stats.exactDuplicates} exact and {stats.nearDuplicates} near duplicates removed → {stats.selected} kept. Closest pair: distance{" "}
-            {stats.minDistance} (a near duplicate is below {stats.threshold}); on average {stats.meanDistance}. Covers {stats.coverage.targets} target degrees, {stats.coverage.registers} registers, {stats.coverage.strategies} strategy families, {stats.coverage.rhythms} rhythmic characters, {stats.coverage.contours} contours.
-          </p>
-          {stats.note && (
-            <p className="ph-note" data-testid="ph-fewer">
+        <aside className="card wb-right" aria-label="Alternatives">
+          <div className="wb-right-head">
+            <h2 data-testid="ph-alt-title">Alternatives ({candidates.length})</h2>
+            {stats && (
+              <button className="icon-btn" onClick={() => setModal("stats")} aria-label="How these were chosen" title="How these were chosen" data-testid="ph-stats-open">
+                <Info {...IC} />
+              </button>
+            )}
+          </div>
+          {stats?.note && (
+            <p className="banner" data-testid="ph-fewer">
               {stats.note}
             </p>
           )}
-          <ol className="ph-cands" data-testid="ph-candidates">
-            {candidates.map((c, i) => (
-              <li key={`${c.id}-${i}`} className={candidate === c ? "active" : ""}>
-                <div className="ph-cand-head">
-                  <b>#{i + 1}</b>
-                  <span className="ph-score" title="adherence to the stated heuristics, not beauty">
-                    {c.score.total.toFixed(2)}
-                  </span>
-                  <span className="ph-chips">
-                    {c.chips.map((chip) => (
+          {candidates.length === 0 ? (
+            <p className="hint">{loaded ? "A loaded document has no alternatives." : "Contrasting phrases will appear here, each differing in target, register, strategy, contour or rhythm."}</p>
+          ) : (
+            <ol className="wb-alts" data-testid="ph-candidates">
+              {candidates.map((c, i) => (
+                <li key={`${c.id}-${i}`} className={`alt${candidate === c ? " active" : ""}`} onClick={() => adopt(c, req)} data-alt={i + 1}>
+                  <button
+                    className="alt-play"
+                    aria-label={`Listen to phrase ${i + 1}`}
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      adopt(c, req);
+                      setTimeout(() => void playerRef.current?.play().then(() => setPlaying(true)), 400);
+                    }}
+                    data-testid={`ph-listen-${i + 1}`}
+                  >
+                    <Play {...IC_SM} />
+                  </button>
+                  <div className="alt-mid">
+                    <Spark c={c} />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <span className="alt-no">{i + 1}</span>
+                    <button
+                      className="alt-more"
+                      aria-label={`Details of phrase ${i + 1}`}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        setOpenScore(`${i}`);
+                        setModal("detail");
+                      }}
+                      data-testid={`ph-detail-${i + 1}`}
+                    >
+                      <EllipsisVertical {...IC} />
+                    </button>
+                  </div>
+                  <div className="alt-chips">
+                    {c.chips.slice(0, 3).map((chip) => (
                       <span key={chip} className="ph-chip">
                         {chip}
                       </span>
                     ))}
-                  </span>
-                  <button
-                    onClick={() => {
-                      adopt(c, req);
-                      setTimeout(() => void playerRef.current?.play().then(() => setPlaying(true)), 400);
-                    }}
-                  >
-                    ▶ Listen
-                  </button>
-                  <button onClick={() => adopt(c, req)} disabled={candidate === c}>
-                    {candidate === c ? "Selected" : "Select"}
-                  </button>
-                  <button onClick={() => setOpenScore(openScore === `${i}` ? null : `${i}`)}>details</button>
-                </div>
-                <div className="ph-how">{c.summary}</div>
-                {c.distinguishing.length > 0 && <div className="ph-distinct">{c.distinguishing.join(" · ")}</div>}
-                {openScore === `${i}` && (
-                  <table className="ph-score-table">
-                    <tbody>
-                      {c.score.parts.map((p) => (
-                        <tr key={p.name}>
-                          <td>{p.name}</td>
-                          <td>{p.value.toFixed(2)}</td>
-                          <td>×{p.weight}</td>
-                          <td className="muted">{p.why}</td>
-                        </tr>
-                      ))}
-                      <tr>
-                        <td colSpan={4} className="muted">
-                          {c.score.disclaimer}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                )}
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
+                  </div>
+                  <div className="alt-how">{c.summary}</div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </aside>
+      </div>
 
-      {candidate && !edited && !loaded && (
-        <section className="panel ph-develop" aria-label="Develop the selected phrase" data-testid="ph-develop">
-          <h2>
-            Develop phrase {candidate.id.replace("phrase-", "#")} <small>lock what you like, vary the rest</small>
-          </h2>
-          <div className="ph-locks">
-            {LOCKS.map((l) => (
-              <label key={l.aspect} className="check" title={l.hint}>
-                <input type="checkbox" checked={locks.includes(l.aspect)} onChange={(ev) => setLocks((cur) => (ev.target.checked ? [...cur, l.aspect] : cur.filter((a) => a !== l.aspect)))} data-testid={`ph-lock-${l.aspect}`} />
-                keep {l.label}
-              </label>
-            ))}
-            <button className="play" onClick={develop} disabled={busy} data-testid="ph-develop-go">
-              Develop variations
-            </button>
-          </div>
-        </section>
-      )}
+      <footer className="wb-bottom">
+        <div className="seg" role="group" aria-label="Actions">
+          <button className="primary" onClick={generate} disabled={busy} data-testid="ph-generate-bottom">
+            Generate
+          </button>
+          <button onClick={() => setModal("develop")} disabled={!ir} data-testid="ph-develop-open">
+            Develop
+          </button>
+          <button onClick={() => setModal("inspect")} disabled={!ir} data-testid="ph-inspect-tab">
+            Inspect
+          </button>
+          <button onClick={() => setModal("analysis")} disabled={!ir} data-testid="ph-analysis-open">
+            Analysis
+          </button>
+        </div>
+        <div className="bottom-right">
+          <span className="muted">
+            seed <b>{e.seed}</b>
+          </span>
+          <button className="btn" onClick={newSeed} disabled={busy || candidates.length === 0} data-testid="ph-newseed-bottom">
+            Another set <ChevronRight {...IC_SM} />
+          </button>
+        </div>
+      </footer>
 
-      {ir && schedule && (
-        <>
-          {loaded && (
-            <div className="panel loaded-note" data-testid="ph-loaded">
-              Showing <b>{loaded.name}</b>. You can inspect, analyse and edit its notes. Exploring again uses the controls above.
+      {/* ── modals ─────────────────────────────────────────────────────────── */}
+      <Modal open={modal === "space"} onClose={closeModal} title="Generation space" size="wide" testId="ph-space-modal" footer={<button className="btn primary" onClick={closeModal}>Done</button>}>
+        <Tabs
+          label="Generation space"
+          value={spaceTab}
+          onChange={setSpaceTab}
+          tabs={[
+            { id: "targets", label: "Targets", testId: "ph-space-targets" },
+            { id: "melody", label: "Melody", testId: "ph-space-melody" },
+            { id: "constraints", label: "Constraints", testId: "ph-space-constraints" },
+            { id: "results", label: "Results", testId: "ph-space-results" },
+          ]}
+        />
+        <div style={{ marginTop: 14 }}>
+          {spaceTab === "targets" && (
+            <div className="form-grid">
+              <div className="span-all">
+                <p className="hint">Explore tries the targets ticked here (none ticked means every compatible chord tone and natural extension of {targets.chord}). Choosing a single target in the Target menu locks it instead.</p>
+              </div>
+              <div className="span-all deg-grid" data-testid="ph-degrees">
+                {targets.options.map((o) => (
+                  <label key={o.degree} title={`${o.role}${o.kind === "chord-tone" ? "" : ` (${o.kind})`}`}>
+                    <input
+                      type="checkbox"
+                      checked={activeDegrees.includes(o.degree)}
+                      disabled={e.mode === "focus"}
+                      onChange={(ev) => {
+                        const next = ev.target.checked ? [...activeDegrees, o.degree] : activeDegrees.filter((d) => d !== o.degree);
+                        setE({ degrees: next.length === 0 ? "all" : next });
+                      }}
+                    />
+                    {o.note}
+                    <small>{o.degree}</small>
+                  </label>
+                ))}
+              </div>
+              <Dim label="Octave" value={e.bands} options={BAND_NAMES.map((b) => ({ id: b, name: `${b} register` }))} onChange={(v) => setE({ bands: v })} testid="ph-bands" />
             </div>
           )}
-
-          <section className="panel transport" aria-label="Transport">
-            <button className="play" onClick={() => void toggle()} aria-label={playing ? "Pause" : "Play"}>
-              {playing ? "⏸ Pause" : "▶ Play"}
-            </button>
-            <button onClick={rewind} aria-label="Stop and rewind">
-              ⏹ Rewind
-            </button>
-            <span className="muted" data-testid="ph-audio">
-              {ir.chords.map((c) => c.symbol).join(" → ")} · {ir.tempo?.bpm} BPM · rendered in {audioMs} ms · looping
-            </span>
-            <label className="zoom">
-              Zoom
-              <input type="range" min={40} max={300} value={pxPerSecond} onChange={(ev) => setPxPerSecond(Number(ev.target.value))} />
-            </label>
-          </section>
-
-          <section className="panel">
-            <h2>
-              Rhythm and harmony <small>click a note to inspect it; click the background to move the playhead</small>
-            </h2>
-            <div className="ph-legend">
-              <i className="ph-note ph-target" /> target arrival <i className="ph-note ph-outline" /> chord outline <i className="ph-note ph-embellish" /> approach / enclosure / run <i className="ph-note ph-bass" /> bass root
+          {spaceTab === "melody" && (
+            <div className="form-grid">
+              <Dim label="Melodic strategy" value={e.strategies} options={STRATEGIES.map((s) => ({ id: s.id, name: s.name }))} onChange={(v) => setE({ strategies: v })} testid="ph-strategies-modal" />
+              <Dim label="Contour" value={e.contours} options={CONTOUR_CHOICES.filter((c) => c !== "any").map((c) => ({ id: c, name: c }))} onChange={(v) => setE({ contours: v })} testid="ph-contours" />
+              <Dim label="Rhythmic character" value={e.rhythms} options={RHYTHM_CHARACTERS.map((r) => ({ id: r.id, name: r.name }))} onChange={(v) => setE({ rhythms: v })} testid="ph-rhythms-modal" />
+              <Dim label="Density" value={e.densities} options={DENSITIES.map((d) => ({ id: d, name: d }))} onChange={(v) => setE({ densities: v })} testid="ph-densities-modal" />
+              <Dim label="Phrase length" value={e.lengths} options={LENGTHS.map((l) => ({ id: l, name: l === "short" ? "short (2 beats)" : l === "standard" ? "standard (1 bar)" : "long (1½ bars, two chords)" }))} onChange={(v) => setE({ lengths: v })} testid="ph-lengths-modal" />
+              <p className="hint span-all">A dimension left on “explore all” is varied across its values; pick one to lock it. Fewer phrases are returned rather than near-duplicates.</p>
             </div>
-            <PhraseRoll ir={ir} schedule={schedule} pxPerSecond={pxPerSecond} selected={selected} melodyVoice={MELODY} playheadRef={playheadRef} scrollRef={scrollRef} onSelect={setSelected} onSeek={(f) => playerRef.current?.seek(f)} />
-          </section>
+          )}
+          {spaceTab === "constraints" && (
+            <div className="form-grid">
+              <label className="field">
+                <span>Lowest note</span>
+                <select value={regLo} onChange={(ev) => set({ register: [Math.min(Number(ev.target.value), regHi), regHi] })}>
+                  {REGISTER.map((m) => (
+                    <option key={m} value={m}>
+                      {midiName(m)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Highest note</span>
+                <select value={regHi} onChange={(ev) => set({ register: [regLo, Math.max(Number(ev.target.value), regLo)] })}>
+                  {REGISTER.map((m) => (
+                    <option key={m} value={m}>
+                      {midiName(m)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>
+                  Largest leap <b>{req.maxLeap}</b> semitones
+                </span>
+                <input type="range" min={2} max={14} value={req.maxLeap} onChange={(ev) => set({ maxLeap: Number(ev.target.value) })} />
+              </label>
+              <label className="field">
+                <span>
+                  Highest fret <b>{req.maxFret}</b>
+                </span>
+                <input type="range" min={5} max={22} value={req.maxFret} onChange={(ev) => set({ maxFret: Number(ev.target.value) })} />
+              </label>
+            </div>
+          )}
+          {spaceTab === "results" && (
+            <div className="form-grid">
+              <label className="field">
+                <span>Contrasting phrases (at most)</span>
+                <select value={e.count} onChange={(ev) => setE({ count: Number(ev.target.value) })} data-testid="ph-count-modal">
+                  {COUNTS.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Seed</span>
+                <input type="number" min={0} value={e.seed} onChange={(ev) => setE({ seed: Math.max(0, Math.floor(Number(ev.target.value) || 0)) })} data-testid="ph-seed" />
+              </label>
+              <p className="hint span-all">The same settings and seed always give the same phrases. “Another set” moves to the next seed.</p>
+            </div>
+          )}
+        </div>
+      </Modal>
 
-          <section className="panel">
-            <h2>
-              Fretboard <small>rings: the whole phrase · filled: sounding now, or the selected note</small>
-            </h2>
-            <Fretboard board={board} frets={Math.min(22, Math.max(req.maxFret + 2, 12))} notes={fretNotes} ghost={fretGhost.filter((g) => !fretNotes.some((n) => n.string === g.string && n.fret === g.fret))} showScale={false} />
-          </section>
+      <Modal
+        open={modal === "develop"}
+        onClose={closeModal}
+        title={candidate ? `Develop phrase ${candidate.id.replace("phrase-", "#")}` : "Develop"}
+        testId="ph-develop"
+        footer={
+          <>
+            <button className="btn" onClick={closeModal}>Cancel</button>
+            <button
+              className="btn primary"
+              disabled={busy || !candidate || edited || !!loaded}
+              onClick={() => {
+                closeModal();
+                develop();
+              }}
+              data-testid="ph-develop-go"
+            >
+              Develop variations
+            </button>
+          </>
+        }
+      >
+        {candidate && !edited && !loaded ? (
+          <>
+            <p className="hint" style={{ marginBottom: 12 }}>Lock what you like about this phrase and explore variations of the rest.</p>
+            <div className="lock-grid">
+              {LOCKS.map((l) => (
+                <label key={l.aspect} title={l.hint}>
+                  <input type="checkbox" checked={locks.includes(l.aspect)} onChange={(ev) => setLocks((cur) => (ev.target.checked ? [...cur, l.aspect] : cur.filter((a) => a !== l.aspect)))} data-testid={`ph-lock-${l.aspect}`} />
+                  <span>
+                    <b>keep {l.label}</b>
+                    <small>{l.hint}</small>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="hint">Develop works on a generated phrase that has not been edited by hand. Select one of the alternatives first{edited ? " (this one has been edited)" : ""}.</p>
+        )}
+      </Modal>
 
-          <div className="ph-two">
-            <section className="panel ph-inspect" aria-label="Note inspector" data-testid="ph-inspector">
-              <h2>Inspect a note</h2>
-              {!sel ? (
-                <p className="muted">Select a note in the roll.</p>
-              ) : (
-                <>
-                  <p>
-                    <b className="ph-big">{sel.pitch.name}</b> · onset {fstr(parseFraction(sel.onset))} · length {fstr(parseFraction(sel.duration))}
-                    {sel.instrument ? ` · string ${board.tuning.strings.length - sel.instrument.string}, fret ${sel.instrument.fret}` : ""}
-                    {sel.provenance ? ` · ${sel.provenance.status}` : ""}
-                  </p>
-                  <dl className="ph-roles">
-                    <dt>harmonic</dt>
-                    <dd>{(selFunctions?.harmonic ?? (selFacts?.harmonic ? [selFacts.harmonic.role] : [])).join(", ") || "not a chord tone"}</dd>
-                    <dt>melodic</dt>
-                    <dd>{(selFunctions?.melodic ?? (sel.roles?.melodic ? [sel.roles.melodic] : [])).join(", ") || "—"}</dd>
-                    <dt>metric</dt>
-                    <dd>{selFunctions?.metric ?? selFacts?.metric.label ?? "—"}</dd>
-                    <dt>structural</dt>
-                    <dd>{(selFunctions?.structural ?? []).join(", ") || "—"}</dd>
-                  </dl>
-                  <h3>Built by</h3>
-                  {selGestures.length === 0 ? (
-                    <p className="muted">no recorded gesture</p>
-                  ) : (
-                    <ul className="ph-steps">
-                      {selGestures.map((g) => (
-                        <li key={g.id}>
-                          <b>{g.kind}</b> <span className="muted">({g.provenance.status})</span>
-                          <div>{g.steps.map(describeStep).join(" → ")}</div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <h3>Readings from analysis</h3>
-                  {selReadings.length === 0 ? (
-                    <p className="muted">none: this note is {selFacts?.harmonic ? "a plain chord tone or tension" : "not explained by any figure"}</p>
-                  ) : (
-                    <ul className="ph-steps">
-                      {selReadings.map((r) => (
-                        <li key={r.id}>
-                          <b>{r.kind}</b>{" "}
-                          <span className="muted">
-                            confidence {r.confidence.toFixed(2)}
-                            {r.alternatives.length ? ` · rivals: ${r.alternatives.join(", ")}` : ""}
-                          </span>
-                          <ul>
-                            {r.evidence.map((x, k) => (
-                              <li key={k}>{x}</li>
-                            ))}
-                          </ul>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <h3>Change it</h3>
-                  <div className="ph-edit">
-                    <button onClick={() => edit({ midi: sel.pitch.midi - 12 })}>−8ve</button>
-                    <button onClick={() => edit({ midi: sel.pitch.midi - 1 })}>−1</button>
-                    <button onClick={() => edit({ midi: sel.pitch.midi + 1 })}>+1</button>
-                    <button onClick={() => edit({ midi: sel.pitch.midi + 12 })}>+8ve</button>
-                    <label>
-                      length
-                      <select value={fstr(parseFraction(sel.duration))} onChange={(ev) => edit({ duration: ev.target.value })}>
-                        {[...new Set([fstr(parseFraction(sel.duration)), ...DURATIONS])].map((d) => (
-                          <option key={d}>{d}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <button onClick={() => edit({ onsetShift: "-1/16" })}>◀ 1/16</button>
-                    <button onClick={() => edit({ onsetShift: "1/16" })}>1/16 ▶</button>
-                  </div>
-                  {editError.length > 0 && (
-                    <div className="panel error" role="alert" data-testid="ph-edit-error">
-                      <b>That edit would make the document invalid, so it was refused:</b>
-                      <ul>
-                        {editError.slice(0, 5).map((i, k) => (
-                          <li key={k}>{i.message}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </>
-              )}
-            </section>
-
-            <section className="panel" aria-label="Construction">
-              <h2>Construction</h2>
-              <ol className="ph-steps" data-testid="ph-construction">
-                {(ir.semantics?.gestures ?? []).map((g) => (
+      <Modal open={modal === "inspect"} onClose={closeModal} title="Inspect a note" testId="ph-inspector" size="normal">
+        {!sel || !ir ? (
+          <p className="hint">Select a note in the roll, then open this again.</p>
+        ) : (
+          <>
+            <p>
+              <b className="ph-big">{sel.pitch.name}</b> · onset {fstr(parseFraction(sel.onset))} · length {fstr(parseFraction(sel.duration))}
+              {sel.instrument ? ` · string ${board.tuning.strings.length - sel.instrument.string}, fret ${sel.instrument.fret}` : ""}
+              {sel.provenance ? ` · ${sel.provenance.status}` : ""}
+            </p>
+            <dl className="ph-roles">
+              <dt>harmonic</dt>
+              <dd>{(selFunctions?.harmonic ?? (selFacts?.harmonic ? [selFacts.harmonic.role] : [])).join(", ") || "not a chord tone"}</dd>
+              <dt>melodic</dt>
+              <dd>{(selFunctions?.melodic ?? (sel.roles?.melodic ? [sel.roles.melodic] : [])).join(", ") || "—"}</dd>
+              <dt>metric</dt>
+              <dd>{selFunctions?.metric ?? selFacts?.metric.label ?? "—"}</dd>
+              <dt>structural</dt>
+              <dd>{(selFunctions?.structural ?? []).join(", ") || "—"}</dd>
+            </dl>
+            <h3>Built by</h3>
+            {selGestures.length === 0 ? (
+              <p className="hint">no recorded gesture</p>
+            ) : (
+              <ul className="ph-steps">
+                {selGestures.map((g) => (
                   <li key={g.id}>
-                    <b>{g.kind}</b>{" "}
-                    <span className="muted">
-                      · {g.provenance.status} · notes {g.notes.join(" ")}
-                    </span>
+                    <b>{g.kind}</b> <span className="muted">({g.provenance.status})</span>
                     <div>{g.steps.map(describeStep).join(" → ")}</div>
                   </li>
                 ))}
-              </ol>
-              {edited && <p className="muted">This phrase has been edited by hand, so its construction is history, not a promise; explore again to develop a phrase.</p>}
-              <h3>Analysis</h3>
-              <label className="check">
-                <input type="checkbox" checked={attachAnalysis} onChange={(ev) => setAttachAnalysis(ev.target.checked)} /> save the analysis with the document
-              </label>
-              <ul className="ph-steps" data-testid="ph-analysis">
-                {(analysis?.interpretations ?? []).map((r) => (
+              </ul>
+            )}
+            <h3>Readings from analysis</h3>
+            {selReadings.length === 0 ? (
+              <p className="hint">none: this note is {selFacts?.harmonic ? "a plain chord tone or tension" : "not explained by any figure"}</p>
+            ) : (
+              <ul className="ph-steps">
+                {selReadings.map((r) => (
                   <li key={r.id}>
                     <b>{r.kind}</b>{" "}
                     <span className="muted">
-                      {r.confidence.toFixed(2)} · {r.notes.join(" ")}
+                      confidence {r.confidence.toFixed(2)}
+                      {r.alternatives.length ? ` · rivals: ${r.alternatives.join(", ")}` : ""}
                     </span>
+                    <ul>
+                      {r.evidence.map((x, k) => (
+                        <li key={k}>{x}</li>
+                      ))}
+                    </ul>
                   </li>
                 ))}
               </ul>
-              {analysis && analysis.unresolved.length > 0 && <p className="muted">Unexplained non-chord tones: {analysis.unresolved.map((u) => u.note).join(", ")}</p>}
-            </section>
+            )}
+            <h3>Change it</h3>
+            <div className="ph-edit">
+              <button className="btn small" onClick={() => edit({ midi: sel.pitch.midi - 12 })}>−8ve</button>
+              <button className="btn small" onClick={() => edit({ midi: sel.pitch.midi - 1 })}>−1</button>
+              <button className="btn small" onClick={() => edit({ midi: sel.pitch.midi + 1 })}>+1</button>
+              <button className="btn small" onClick={() => edit({ midi: sel.pitch.midi + 12 })}>+8ve</button>
+              <label>
+                length{" "}
+                <select value={fstr(parseFraction(sel.duration))} onChange={(ev) => edit({ duration: ev.target.value })}>
+                  {[...new Set([fstr(parseFraction(sel.duration)), ...DURATIONS])].map((d) => (
+                    <option key={d}>{d}</option>
+                  ))}
+                </select>
+              </label>
+              <button className="btn small" onClick={() => edit({ onsetShift: "-1/16" })}><ChevronLeft {...IC_SM} /> 1/16</button>
+              <button className="btn small" onClick={() => edit({ onsetShift: "1/16" })}>1/16 <ChevronRight {...IC_SM} /></button>
+            </div>
+            {editError.length > 0 && (
+              <div className="banner error" role="alert" data-testid="ph-edit-error">
+                <b>That edit would make the document invalid, so it was refused:</b> {editError.slice(0, 5).map((i) => i.message).join(" · ")}
+              </div>
+            )}
+          </>
+        )}
+      </Modal>
+
+      <Modal open={modal === "analysis"} onClose={closeModal} title="Construction and analysis" size="wide" testId="ph-analysis-modal">
+        <Tabs
+          label="Analysis"
+          value={analysisTab}
+          onChange={setAnalysisTab}
+          tabs={[
+            { id: "construction", label: "Construction", testId: "ph-an-construction" },
+            { id: "analysis", label: "Analysis", testId: "ph-an-analysis" },
+          ]}
+        />
+        {ir && analysisTab === "construction" && (
+          <div style={{ marginTop: 12 }}>
+            <ol className="ph-steps" data-testid="ph-construction">
+              {(ir.semantics?.gestures ?? []).map((g) => (
+                <li key={g.id}>
+                  <b>{g.kind}</b>{" "}
+                  <span className="muted">
+                    · {g.provenance.status} · notes {g.notes.join(" ")}
+                  </span>
+                  <div>{g.steps.map(describeStep).join(" → ")}</div>
+                </li>
+              ))}
+            </ol>
+            {edited && <p className="hint">This phrase has been edited by hand, so its construction is history, not a promise; explore again to develop a phrase.</p>}
           </div>
-        </>
-      )}
-    </main>
+        )}
+        {ir && analysisTab === "analysis" && (
+          <div style={{ marginTop: 12 }}>
+            <ul className="ph-steps" data-testid="ph-analysis">
+              {(analysis?.interpretations ?? []).map((r) => (
+                <li key={r.id}>
+                  <b>{r.kind}</b>{" "}
+                  <span className="muted">
+                    {r.confidence.toFixed(2)} · {r.notes.join(" ")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {analysis && analysis.unresolved.length > 0 && <p className="hint">Unexplained non-chord tones: {analysis.unresolved.map((u) => u.note).join(", ")}</p>}
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={modal === "stats" && !!stats} onClose={closeModal} title="How these phrases were chosen" testId="ph-stats-modal">
+        {stats && (
+          <>
+            <p className="ph-stats" data-testid="ph-stats">
+              {stats.intentionsTried} intentions tried, {stats.intentionsReachable} reachable → {stats.poolSize} phrases, all verified ({stats.rejectedInvalid} rejected) → {stats.exactDuplicates} exact and {stats.nearDuplicates} near duplicates removed → {stats.selected} kept. Closest pair: distance {stats.minDistance} (a near duplicate is below {stats.threshold}); on average {stats.meanDistance}.
+            </p>
+            <p>
+              Covers {stats.coverage.targets} target degrees, {stats.coverage.registers} registers, {stats.coverage.strategies} strategy families, {stats.coverage.rhythms} rhythmic characters, {stats.coverage.contours} contours. Seed {stats.seed}.
+            </p>
+            <p className="hint">Scores measure adherence to the stated heuristics, not beauty.</p>
+          </>
+        )}
+      </Modal>
+
+      <Modal open={modal === "detail" && openScore !== null && !!candidates[Number(openScore)]} onClose={closeModal} title={`Phrase ${Number(openScore) + 1}`} testId="ph-detail-modal">
+        {openScore !== null && candidates[Number(openScore)] && (
+          <>
+            <p>{candidates[Number(openScore)]!.summary}</p>
+            <p className="ph-distinct">{candidates[Number(openScore)]!.distinguishing.join(" · ")}</p>
+            <table className="ph-score-table">
+              <tbody>
+                {candidates[Number(openScore)]!.score.parts.map((p) => (
+                  <tr key={p.name}>
+                    <td>{p.name}</td>
+                    <td>{p.value.toFixed(2)}</td>
+                    <td>×{p.weight}</td>
+                    <td className="muted" style={{ whiteSpace: "normal" }}>{p.why}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td colSpan={4} className="muted" style={{ whiteSpace: "normal" }}>
+                    {candidates[Number(openScore)]!.score.disclaimer}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </>
+        )}
+      </Modal>
+
+      <Modal open={modal === "settings"} onClose={closeModal} title="Settings" size="narrow" testId="ph-settings-modal" footer={<button className="btn primary" onClick={closeModal}>Done</button>}>
+        <div className="form-grid">
+          <label className="field span-all">
+            <span>
+              Roll zoom <b>{pxPerSecond}</b> px per second
+            </span>
+            <input type="range" min={40} max={300} value={pxPerSecond} onChange={(ev) => setPxPerSecond(Number(ev.target.value))} />
+          </label>
+          <label className="field span-all" style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <input type="checkbox" checked={attachAnalysis} onChange={(ev) => setAttachAnalysis(ev.target.checked)} style={{ width: "auto" }} />
+            <span>Save the analysis with the document</span>
+          </label>
+          <p className="hint span-all">Tempo, key and the generation controls are on the main screen; every dimension of the space is under the ⚙ next to Variations.</p>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+/** A tiny contour of a candidate phrase, to tell the alternatives apart at a glance. */
+function Spark({ c }: { c: ExploredPhrase }) {
+  const pts: { x: number; m: number }[] = [];
+  for (const ev of c.events) if (ev.kind === "note") pts.push({ x: fnum(ev.onset), m: midi(ev.pitch) });
+  if (pts.length === 0) return null;
+  const x0 = Math.min(...pts.map((p) => p.x));
+  const x1 = Math.max(...pts.map((p) => p.x), x0 + 1e-9);
+  const lo = Math.min(...pts.map((p) => p.m));
+  const hi = Math.max(...pts.map((p) => p.m), lo + 1);
+  const W = 200;
+  const H = 34;
+  const px = (x: number) => 4 + ((x - x0) / (x1 - x0)) * (W - 8);
+  const py = (m: number) => H - 4 - ((m - lo) / (hi - lo)) * (H - 8);
+  return (
+    <svg className="alt-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="contour of the phrase">
+      <path d={pts.map((p, i) => `${i ? "L" : "M"}${px(p.x).toFixed(1)},${py(p.m).toFixed(1)}`).join(" ")} />
+      {pts.map((p, i) => (
+        <circle key={i} cx={px(p.x)} cy={py(p.m)} r={1.8} />
+      ))}
+    </svg>
   );
 }
 

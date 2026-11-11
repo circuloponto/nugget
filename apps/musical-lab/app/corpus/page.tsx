@@ -1,7 +1,7 @@
-import CorpusExplorer from "./CorpusExplorer";
+import AppShell from "../ui/AppShell";
 
-export const metadata = { title: "Corpus Analysis — Musical Lab" };
+export const metadata = { title: "Corpus Analysis — Nugget" };
 
 export default function CorpusPage() {
-  return <CorpusExplorer />;
+  return <AppShell initial="corpus" />;
 }

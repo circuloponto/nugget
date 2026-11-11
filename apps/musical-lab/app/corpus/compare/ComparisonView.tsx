@@ -1,13 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Info, ArrowUp, ArrowDown } from "lucide-react";
+import { IC, IC_SM } from "../../ui/icons";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { corpus } from "@musical-lab/engine";
+import Modal from "../../ui/Modal";
+import Tabs from "../../ui/Tabs";
+import { Topbar } from "../../ui/shellContext";
 
 type Comparison = corpus.GeneratorComparison;
 type Row = corpus.MetricRow;
 type Dists = corpus.Distributions;
 
-const COLORS = { generator: "#1f6f8b", corpus: "#b8976c", fourFour: "#6b5a3e" } as const;
+const COLORS = { generator: "var(--teal)", corpus: "var(--accent)", fourFour: "var(--ink)" } as const;
 const GROUPS: { id: corpus.MetricGroup | "all"; name: string }[] = [
   { id: "all", name: "all" },
   { id: "size", name: "size" },
@@ -21,10 +26,13 @@ const GROUPS: { id: corpus.MetricGroup | "all"; name: string }[] = [
 
 const fmt = (v: number, unit: Row["unit"]): string => (unit === "share" ? `${Math.round(v * 1000) / 10}%` : unit === "score" ? v.toFixed(2) : String(Math.round(v * 100) / 100));
 
-export default function ComparisonView() {
+export default function ComparisonView({ active = true }: { active?: boolean }) {
   const [state, setState] = useState<{ comparison?: Comparison | null; reason?: string; error?: string } | null>(null);
   const [group, setGroup] = useState<(typeof GROUPS)[number]["id"]>("all");
   const [onlyOutside, setOnlyOutside] = useState(false);
+  const [tab, setTab] = useState<"metrics" | "distributions" | "examples">("metrics");
+  const [modal, setModal] = useState<null | "caveats">(null);
+  const closeModal = useCallback(() => setModal(null), []);
 
   useEffect(() => {
     fetch("/api/corpus?comparison=1")
@@ -38,42 +46,32 @@ export default function ComparisonView() {
   const outside = c ? c.rows.filter((r) => r.verdict !== "within").length : 0;
 
   return (
-    <main className="lab lab2 co">
-      <header className="lab2-head">
-        <div>
-          <h1>
-            Generator against the corpus <span>phase 3H.4</span>
-          </h1>
-          <p>
-            Phrases written by Nugget&apos;s Phase 3 generator, measured by exactly the same analysis as the real melodies. A difference is where to look, not a verdict on quality. <a href="/corpus">← Corpus Analysis</a> · <a href="/">Musical Lab</a>
-          </p>
-        </div>
-      </header>
+    <div className="cmp2">
+      <Topbar active={active}>
+        <button className="tool-btn" onClick={() => setModal("caveats")} disabled={!c} title="Read this before the numbers" data-testid="cmp-caveats-open">
+          <Info {...IC} />
+          <span className="lbl"> Read first</span>
+        </button>
+      </Topbar>
 
-      {state?.error && <div className="panel error" role="alert">{state.error}</div>}
-      {state && !c && !state.error && (
-        <div className="panel co-empty" data-testid="cmp-unavailable">
-          <h2>No comparison to show</h2>
-          <p>{state.reason ?? "Nothing to show."}</p>
+      {state?.error && (
+        <div className="banner error" role="alert">
+          {state.error}
         </div>
       )}
-      {!state && <div className="panel muted">Loading…</div>}
+      {state && !c && !state.error && (
+        <div className="stage-empty" data-testid="cmp-unavailable">
+          <div>
+            <b>No comparison to show</b>
+            {state.reason ?? "Nothing to show."}
+          </div>
+        </div>
+      )}
+      {!state && <div className="stage-empty">Loading…</div>}
 
       {c && (
         <>
-          <section className="panel co-notice" role="note" data-testid="cmp-caveats">
-            <b>Read this first.</b>
-            <ul>
-              {c.caveats.map((t, i) => (
-                <li key={i}>{t}</li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="panel" data-testid="cmp-summary">
-            <h2>
-              What was compared <small>same analysis on both sides</small>
-            </h2>
+          <section className="card cmp2-summary" data-testid="cmp-summary">
             <div className="co-figs">
               <Fig k="generated phrases" v={`${c.sample.phrases} from ${c.sample.runs} runs`} hint={`${c.sample.keys.length} keys × seeds ${c.sample.seeds.join(", ")}; every phrase in ${c.sample.meter}`} />
               <Fig k="corpus phrases" v={`${c.corpus.phrases} from ${c.corpus.pieces} tunes`} hint="the corpus's hypothesised phrases at the primary reading" />
@@ -81,68 +79,95 @@ export default function ComparisonView() {
               <Fig k="development / held-out" v={`${c.corpus.split.development.length} / ${c.corpus.split.heldOut.length} tunes`} hint="fixed split by category and hash, for later work" />
               <Fig k="outside the corpus's range" v={`${outside} of ${c.rows.length} metrics`} hint="generator value outside the 10th–90th percentile of individual corpus tunes" />
             </div>
-            <div className="co-legend2">
-              <i style={{ background: COLORS.generator }} /> generator <i style={{ background: COLORS.corpus }} /> whole corpus <i style={{ background: COLORS.fourFour }} /> corpus, 4/4 tunes only <span className="co-band-key" /> corpus spread (10th–90th percentile across tunes)
-            </div>
+            <p className="banner cmp2-strip" data-testid="cmp-strip">
+              <span>A difference is where to look, not a verdict on quality. The corpus is 23 folk dance tunes; the generator writes jazz-style lines over a ii–V–I.</span>
+              <button className="btn small" onClick={() => setModal("caveats")}>All caveats</button>
+            </p>
           </section>
 
-          <section className="panel" data-testid="cmp-metrics">
-            <h2>
-              Metric by metric <small>dot = generator · tick = corpus · hollow = corpus 4/4 · band = how much individual corpus tunes differ</small>
-            </h2>
-            <div className="co-level" role="group" aria-label="Metric group">
-              {GROUPS.map((g) => (
-                <button key={g.id} className={group === g.id ? "on" : ""} onClick={() => setGroup(g.id)} data-testid={`cmp-group-${g.id}`}>
-                  {g.name}
-                </button>
-              ))}
-              <label className="check">
-                <input type="checkbox" checked={onlyOutside} onChange={(e) => setOnlyOutside(e.target.checked)} data-testid="cmp-outside" /> only metrics outside the corpus&apos;s range
-              </label>
-              <span className="muted" data-testid="cmp-rowcount">{rows.length} shown</span>
+          <section className="card cmp2-body">
+            <div className="cmp2-head">
+              <Tabs
+                label="Comparison"
+                value={tab}
+                onChange={setTab}
+                tabs={[
+                  { id: "metrics", label: "Metrics", testId: "cmp-tab-metrics" },
+                  { id: "distributions", label: "Distributions", testId: "cmp-tab-dists" },
+                  { id: "examples", label: "Phrases", testId: "cmp-tab-examples" },
+                ]}
+              />
+              {tab === "metrics" && (
+                <div className="cmp2-filters">
+                  <Tabs label="Metric group" value={group} onChange={setGroup} tabs={GROUPS.map((g) => ({ id: g.id, label: g.name, testId: `cmp-group-${g.id}` }))} />
+                  <label className="co2-check">
+                    <input type="checkbox" checked={onlyOutside} onChange={(e) => setOnlyOutside(e.target.checked)} data-testid="cmp-outside" /> only outside the corpus&apos;s range
+                  </label>
+                  <span className="muted" data-testid="cmp-rowcount">{rows.length} shown</span>
+                </div>
+              )}
             </div>
-            <div className="cmp-rows">
-              {rows.map((r) => (
-                <RangeRow key={r.id} row={r} />
-              ))}
-            </div>
-          </section>
 
-          <section className="panel" data-testid="cmp-dists">
-            <h2>
-              Distributions <small>the same measures, side by side</small>
-            </h2>
-            <div className="co-cols">
-              <Grouped title="Note lengths (share of notes)" d={c.distributions} pick={(d) => d.durationClasses} testId="cmp-durations" />
-              <Grouped title="Last note of the phrase" d={c.distributions} pick={(d) => d.finalBeats} testId="cmp-final" />
-              <Grouped title="Phrase contour" d={c.distributions} pick={(d) => d.contour} testId="cmp-contour" />
-              <Grouped title="Activity shape" d={c.distributions} pick={(d) => d.activityShape} testId="cmp-activity-shape" />
-            </div>
-            <Grouped title="Melodic intervals (semitones, share of intervals)" d={c.distributions} pick={(d) => d.intervals} testId="cmp-intervals" wide />
-            <ActivityCurve d={c.distributions} />
-          </section>
+            <div className="cmp2-scroll">
+              {tab === "metrics" && (
+                <div data-testid="cmp-metrics">
+                  <div className="co-legend2">
+                    <i style={{ background: COLORS.generator }} /> generator (dot) <i style={{ background: COLORS.corpus }} /> whole corpus (tick) <i style={{ background: COLORS.fourFour }} /> corpus, 4/4 only (ring) <span className="co-band-key" /> how much individual corpus tunes differ (10th–90th percentile)
+                  </div>
+                  <div className="cmp-rows">
+                    {rows.map((r) => (
+                      <RangeRow key={r.id} row={r} />
+                    ))}
+                  </div>
+                </div>
+              )}
 
-          <section className="panel" data-testid="cmp-examples">
-            <h2>
-              Phrases to look at <small>chosen at even intervals, not picked; drawn on the same scale rules</small>
-            </h2>
-            <h3 className="cmp-h3">Generator</h3>
-            <div className="cmp-ex">
-              {c.examples.generator.map((e) => (
-                <MiniRoll key={e.id} e={e} />
-              ))}
+              {tab === "distributions" && (
+                <div data-testid="cmp-dists">
+                  <div className="co-legend2">
+                    <i style={{ background: COLORS.generator }} /> generator <i style={{ background: COLORS.corpus }} /> whole corpus <i style={{ background: COLORS.fourFour }} /> corpus, 4/4 only
+                  </div>
+                  <div className="co-cols">
+                    <Grouped title="Note lengths (share of notes)" d={c.distributions} pick={(d) => d.durationClasses} testId="cmp-durations" />
+                    <Grouped title="Last note of the phrase" d={c.distributions} pick={(d) => d.finalBeats} testId="cmp-final" />
+                    <Grouped title="Phrase contour" d={c.distributions} pick={(d) => d.contour} testId="cmp-contour" />
+                    <Grouped title="Activity shape" d={c.distributions} pick={(d) => d.activityShape} testId="cmp-activity-shape" />
+                  </div>
+                  <Grouped title="Melodic intervals (semitones, share of intervals)" d={c.distributions} pick={(d) => d.intervals} testId="cmp-intervals" wide />
+                  <ActivityCurve d={c.distributions} />
+                </div>
+              )}
+
+              {tab === "examples" && (
+                <div data-testid="cmp-examples">
+                  <h3 className="cmp-h3">Generator</h3>
+                  <div className="cmp-ex">
+                    {c.examples.generator.map((e) => (
+                      <MiniRoll key={e.id} e={e} />
+                    ))}
+                  </div>
+                  <h3 className="cmp-h3">Corpus</h3>
+                  <div className="cmp-ex">
+                    {c.examples.corpus.map((e) => (
+                      <MiniRoll key={e.id} e={e} />
+                    ))}
+                  </div>
+                  <p className="muted">Chosen at even intervals, not picked. Bar height is the note&apos;s length class (short, medium, sustained); hatched blocks are written rests. These are pictures of rhythm and contour, not recordings: listening comes in the next stage.</p>
+                </div>
+              )}
             </div>
-            <h3 className="cmp-h3">Corpus</h3>
-            <div className="cmp-ex">
-              {c.examples.corpus.map((e) => (
-                <MiniRoll key={e.id} e={e} />
-              ))}
-            </div>
-            <p className="muted">Bar height in each drawing is the note&apos;s length class (short, medium, sustained); hatched blocks are written rests. These are pictures of rhythm and contour, not recordings: listening comes in the next stage.</p>
           </section>
         </>
       )}
-    </main>
+
+      <Modal open={modal === "caveats" && !!c} onClose={closeModal} title="Read this first" testId="cmp-caveats">
+        <ul className="cmp-caveats">
+          {c?.caveats.map((t, i) => (
+            <li key={i}>{t}</li>
+          ))}
+        </ul>
+      </Modal>
+    </div>
   );
 }
 
@@ -172,11 +197,11 @@ function RangeRow({ row }: { row: Row }) {
         <i className="cmp-dot" style={{ left: p(row.generator) }} />
       </div>
       <div className="cmp-nums">
-        <span style={{ color: COLORS.generator }}>{fmt(row.generator, row.unit)}</span>
-        <span style={{ color: COLORS.corpus }}>{fmt(row.corpus, row.unit)}</span>
-        <span style={{ color: COLORS.fourFour }}>{fmt(row.corpusFourFour, row.unit)}</span>
+        <span style={{ borderBottom: `3px solid ${COLORS.generator}` }}>{fmt(row.generator, row.unit)}</span>
+        <span style={{ borderBottom: `3px solid ${COLORS.corpus}` }}>{fmt(row.corpus, row.unit)}</span>
+        <span style={{ borderBottom: `3px solid ${COLORS.fourFour}` }}>{fmt(row.corpusFourFour, row.unit)}</span>
       </div>
-      <div className="cmp-verdict">{row.verdict === "within" ? "within" : row.verdict === "above" ? "▲ above" : "▼ below"}</div>
+      <div className="cmp-verdict">{row.verdict === "within" ? "within" : row.verdict === "above" ? <><ArrowUp {...IC_SM} /> above</> : <><ArrowDown {...IC_SM} /> below</>}</div>
     </div>
   );
 }
@@ -202,7 +227,7 @@ function Grouped({ title, d, pick, testId, wide }: { title: string; d: Compariso
             {series.map((s, k) => {
               const h = ((s.v[l] ?? 0) / max) * H;
               return (
-                <rect key={s.name} x={5 + i * gw + k * bw} y={H - h} width={bw - 0.5} height={h} fill={s.color} data-series={s.name} data-label={l} data-value={s.v[l] ?? 0}>
+                <rect key={s.name} x={5 + i * gw + k * bw} y={H - h} width={bw - 0.5} height={h} style={{ fill: s.color }} data-series={s.name} data-label={l} data-value={s.v[l] ?? 0}>
                   <title>{`${s.name}: ${Math.round((s.v[l] ?? 0) * 1000) / 10}% · ${l}`}</title>
                 </rect>
               );
@@ -235,9 +260,9 @@ function ActivityCurve({ d }: { d: Comparison["distributions"] }) {
       <svg viewBox={`0 0 ${W} ${H + 24}`} width="100%" role="img" aria-label="activity curves over the phrase">
         {series.map((s) => (
           <g key={s.name}>
-            <path d={s.v.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")} fill="none" stroke={s.color} strokeWidth={2.2} data-series={s.name} />
+            <path d={s.v.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")} fill="none" style={{ stroke: s.color }} strokeWidth={2.6} data-series={s.name} />
             {s.v.map((v, i) => (
-              <circle key={i} cx={x(i)} cy={y(v)} r={2.6} fill={s.color} />
+              <circle key={i} cx={x(i)} cy={y(v)} r={3} style={{ fill: s.color }} />
             ))}
           </g>
         ))}

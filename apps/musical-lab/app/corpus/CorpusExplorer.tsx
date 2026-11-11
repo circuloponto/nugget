@@ -1,10 +1,15 @@
 "use client";
 
+import { SkipBack, Pause, Play, Square, Music2, ZoomIn, Sigma, X, TriangleAlert, ArrowDown, Pin, Repeat } from "lucide-react";
+import { IC, IC_SM } from "../ui/icons";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { corpus, fnum, fstr, PLUCK_TONES, renderDocument, scheduleFrames, type MusicIR } from "@musical-lab/engine";
 import { LabPlayer } from "../lab/player";
 import CorpusTimeline, { pxPerWhole, TL_LEFT, type Segment } from "./CorpusTimeline";
 import { Bars, ContourSvg, pct, RhythmStrip } from "./charts";
+import Modal from "../ui/Modal";
+import Tabs from "../ui/Tabs";
+import { Topbar } from "../ui/shellContext";
 
 interface IndexRow {
   id: string;
@@ -14,6 +19,8 @@ interface IndexRow {
   bars: number;
   notes: number;
   status: string;
+  /** false when the piece has no MusicIR projection: it opens for analysis but cannot be played. */
+  ir?: boolean;
 }
 interface Catalogue {
   available: boolean;
@@ -25,7 +32,8 @@ interface Catalogue {
 interface Loaded {
   piece: corpus.CorpusPiece;
   report: corpus.ImportReport | null;
-  ir: MusicIR;
+  /** null for an analysis-only piece (no MusicIR projection). */
+  ir: MusicIR | null;
   analysis: corpus.MelodyAnalysis;
   line: corpus.MelodyLine;
 }
@@ -52,7 +60,7 @@ const defaultBpm = (meter: string): number => {
   return n === 3 ? 140 : 115;
 };
 
-export default function CorpusExplorer() {
+export default function CorpusExplorer({ active = true }: { active?: boolean }) {
   const playerRef = useRef<LabPlayer | null>(null);
   const playheadRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -74,11 +82,20 @@ export default function CorpusExplorer() {
   const [highlight, setHighlight] = useState<Highlight | null>(null);
   const [showFaint, setShowFaint] = useState(false);
   const [pinned, setPinned] = useState<Pinned | null>(null);
+  const [rightTab, setRightTab] = useState<"phrase" | "compare" | "inspect">("phrase");
+  const [modal, setModal] = useState<null | "overview" | "licence">(null);
+  const closeModal = useCallback(() => setModal(null), []);
 
   const [bpm, setBpm] = useState(115);
   const [sampleRate, setSampleRate] = useState(44100);
   const [pxPerQuarter, setPxPerQuarter] = useState(46);
   const [playing, setPlaying] = useState(false);
+  /** One-shot by default, so a phrase ending can be heard on its own; Loop repeats the region. */
+  const [loop, setLoop] = useState(false);
+  /** The part being played: a phrase (whole-note positions) or null for the whole piece. */
+  const [region, setRegion] = useState<{ label: string; fromW: number; toW: number } | null>(null);
+  /** The piece shown is not the one asked for yet. */
+  const stale = pieceId !== null && loaded !== null && loaded.piece.id !== pieceId && !loadError;
   const [sounding, setSounding] = useState<string[]>([]);
   const [audioMs, setAudioMs] = useState<number | null>(null);
 
@@ -98,11 +115,13 @@ export default function CorpusExplorer() {
     if (!pieceId) return;
     let live = true;
     setLoadError(null);
+    playerRef.current?.pause();
+    setPlaying(false);
     fetch(`/api/corpus?piece=${encodeURIComponent(pieceId)}`)
       .then((r) => r.json())
       .then((d: { error?: string; reason?: string; piece?: { piece: corpus.CorpusPiece; report: corpus.ImportReport }; ir?: MusicIR; analysis?: corpus.MelodyAnalysis }) => {
         if (!live) return;
-        if (!d.piece || !d.ir || !d.analysis) return setLoadError(d.error ?? d.reason ?? "This piece could not be loaded.");
+        if (!d.piece || !d.analysis) { setLoaded(null); return setLoadError(d.error ?? d.reason ?? "This piece could not be loaded."); }
         const piece = d.piece.piece;
         const line = corpus.melodyFromCorpusPiece(piece);
         playerRef.current?.pause();
@@ -113,10 +132,11 @@ export default function CorpusExplorer() {
         setSelNote(null);
         setSelBoundary(null);
         setHighlight(null);
+        setRegion(null);
         setBpm(defaultBpm(piece.measures[0]!.meter.text));
-        setLoaded({ piece, report: d.piece.report ?? null, ir: d.ir, analysis: d.analysis, line });
+        setLoaded({ piece, report: d.piece.report ?? null, ir: d.ir ?? null, analysis: d.analysis, line });
       })
-      .catch((e) => live && setLoadError(String(e)));
+      .catch((e) => { if (live) { setLoaded(null); setLoadError(String(e)); } });
     return () => {
       live = false;
     };
@@ -130,10 +150,28 @@ export default function CorpusExplorer() {
     return () => p.dispose();
   }, []);
 
-  const doc = useMemo<MusicIR | null>(() => (loaded ? { ...loaded.ir, tempo: { bpm: String(bpm), beat: "1/4" } } : null), [loaded, bpm]);
+  useEffect(() => {
+    if (!active) {
+      playerRef.current?.pause();
+      setPlaying(false);
+    }
+  }, [active]);
+
+  const doc = useMemo<MusicIR | null>(() => (loaded?.ir ? { ...loaded.ir, tempo: { bpm: String(bpm), beat: "1/4" } } : null), [loaded, bpm]);
   const schedule = useMemo(() => (doc ? scheduleFrames(doc, sampleRate) : null), [doc, sampleRate]);
   const framesPerWhole = (sampleRate * 240) / bpm;
   const ppw = pxPerWhole(pxPerQuarter);
+
+  /** Hand the player the loop switch and the region, in frames at the current tempo. */
+  const modeRef = useRef({ loop, region, framesPerWhole });
+  modeRef.current = { loop, region, framesPerWhole };
+  const applyMode = useCallback(() => {
+    const m = modeRef.current;
+    playerRef.current?.setMode(m.loop, m.region ? { from: Math.round(m.region.fromW * m.framesPerWhole), to: Math.round(m.region.toW * m.framesPerWhole) } : null);
+  }, []);
+  useEffect(() => {
+    applyMode();
+  }, [loop, region, framesPerWhole, applyMode]);
 
   useEffect(() => {
     const p = playerRef.current;
@@ -146,10 +184,11 @@ export default function CorpusExplorer() {
       const at = old > 0 ? Math.round((p.position() * r.samples.length) / old) : 0;
       p.load(r.samples, at);
       lastTotal.current = r.samples.length;
+      applyMode();
       setAudioMs(Math.round(performance.now() - t0));
     }, 300);
     return () => clearTimeout(timer);
-  }, [doc]);
+  }, [doc, applyMode]);
 
   useEffect(() => {
     let raf = 0;
@@ -179,17 +218,34 @@ export default function CorpusExplorer() {
 
   const toggle = useCallback(async () => {
     const p = playerRef.current;
-    if (!p) return;
+    if (!p || !doc) return;
     if (p.isPlaying) p.pause();
     else await p.play();
     setPlaying(p.isPlaying);
-  }, []);
+  }, [doc]);
   const rewind = () => {
     playerRef.current?.pause();
     playerRef.current?.seek(0);
     setPlaying(false);
     setSounding([]);
   };
+  /** Play one phrase from its start (once, or repeating it if Loop is on). */
+  const playPhrase = useCallback(
+    async (s: Segment) => {
+      const p = playerRef.current;
+      if (!p || !doc || !loaded) return;
+      const notes = loaded.line.notes;
+      const next = { label: s.id, fromW: fnum(notes[s.from]!.onset), toW: fnum(notes[s.to]!.end) };
+      modeRef.current = { ...modeRef.current, region: next };
+      setRegion(next);
+      applyMode();
+      p.pause();
+      p.seek(Math.round(next.fromW * framesPerWhole));
+      await p.play();
+      setPlaying(p.isPlaying);
+    },
+    [doc, loaded, framesPerWhole, applyMode],
+  );
   const seekWhole = useCallback((w: number) => playerRef.current?.seek(Math.round(w * framesPerWhole)), [framesPerWhole]);
 
   // ── phrase segmentation at the chosen level ─────────────────────────────
@@ -256,276 +312,351 @@ export default function CorpusExplorer() {
   const selBoundaryObj = phr && selBoundary !== null ? phr.candidates.find((c) => c.index === selBoundary) ?? null : null;
 
   // ── render ──────────────────────────────────────────────────────────────
+  const pickSegment = (i: number) => {
+    setSelSegment(i);
+    setSelNote(null);
+    setSelBoundary(null);
+    setRightTab("phrase");
+  };
+  const pickNote = (id: string) => {
+    setSelNote(id);
+    setSelBoundary(null);
+    setRightTab("inspect");
+  };
+  const pickBoundary = (i: number) => {
+    setSelBoundary(i);
+    setSelNote(null);
+    setRightTab("inspect");
+  };
+
   return (
-    <main className="lab lab2 co">
-      <header className="lab2-head">
-        <div>
-          <h1>
-            Corpus Analysis <span>phase 3H</span>
-          </h1>
-          <p>
-            Real melodies, measured. Inspect an imported piece, hear it, and see how its rhythm, contour, motifs and phrase boundaries were read; every boundary is a hypothesis with its evidence. <a href="/">← Musical Lab</a> ·{" "}
-            <a href="/phrase">Phrase Constructor →</a> · <a href="/corpus/compare">Generator against the corpus →</a>
-          </p>
-        </div>
-      </header>
+    <div className="co2">
+      <Topbar active={active}>
+        <button className="tool-btn" onClick={rewind} aria-label="Back to the start" title="Back to the start" disabled={!doc}>
+          <SkipBack {...IC} />
+        </button>
+        <button className="tool-btn primary" onClick={() => void toggle()} aria-label={playing ? "Pause" : "Play"} title={doc ? "Play from here, once to the end" : "No MusicIR for this piece: it cannot be played"} disabled={!doc} data-testid="co-play">
+          {playing ? <Pause {...IC} /> : <Play {...IC} />}
+        </button>
+        <button className="tool-btn" onClick={rewind} aria-label="Stop and rewind" title="Stop" disabled={!doc}>
+          <Square {...IC} />
+        </button>
+        <button className={`tool-btn${loop ? " on" : ""}`} onClick={() => setLoop((v) => !v)} aria-pressed={loop} aria-label="Loop" title={loop ? "Looping the played part: click for one pass" : "One pass: click to loop the played part"} disabled={!doc} data-testid="co-loop">
+          <Repeat {...IC} />
+          <span className="lbl">Loop</span>
+        </button>
+        <span className="pill" title="Tempo, quarter notes per minute">
+          <Music2 {...IC} />
+          <input type="range" min={50} max={240} value={bpm} onChange={(e) => setBpm(Number(e.target.value))} aria-label="Tempo in quarter notes per minute" data-testid="co-bpm" />
+          <b>{bpm}</b>
+        </span>
+        <span className="pill pill-opt" title="Timeline zoom">
+          <ZoomIn {...IC} />
+          <input type="range" min={20} max={120} value={pxPerQuarter} onChange={(e) => setPxPerQuarter(Number(e.target.value))} aria-label="Zoom" />
+        </span>
+        <span className="pill pill-opt muted" data-testid="co-audio">
+          {!loaded ? "—" : !doc ? "analysis only" : audioMs === null ? "rendering…" : `rendered in ${audioMs} ms`}
+        </span>
+      </Topbar>
 
       {catError && (
-        <div className="panel error" role="alert">
+        <div className="banner error co2-wide" role="alert">
           Could not reach the corpus service: {catError}
         </div>
       )}
       {cat && !cat.available && (
-        <div className="panel co-empty" data-testid="co-unavailable">
-          <h2>No corpus to show</h2>
-          <p>{cat.reason}</p>
-          <p className="muted">
-            The corpus is research-only GPL-3.0 data. It is kept out of the repository and the app bundle, so it appears here only after you import it on this machine (<code>npm run corpus -- &lt;archive.zip&gt;</code>) and only for requests from this machine.
-          </p>
+        <div className="stage-empty co2-wide" data-testid="co-unavailable">
+          <div>
+            <b>No corpus to show</b>
+            {cat.reason}
+            <br />
+            <span className="muted">The corpus is research-only GPL-3.0 data. It is kept out of the repository and the app bundle, so it appears here only after you import it on this machine, and only for requests from this machine.</span>
+          </div>
         </div>
       )}
+      {!cat && !catError && <div className="stage-empty co2-wide">Loading…</div>}
 
       {cat?.available && cat.index && (
         <>
-          <div className="panel co-notice" role="note" data-testid="co-notice">
-            <b>Licence.</b> {cat.index.notice}{" "}
-            {cat.index.corpus.repository && (
-              <a href={cat.index.corpus.repository} target="_blank" rel="noreferrer">
-                source
-              </a>
-            )}
-          </div>
-
-          <div className="co-grid">
-            <aside className="panel co-list" aria-label="Imported compositions">
+          <aside className="card co2-list" aria-label="Imported compositions">
+            <div className="co2-list-head">
               <h2>
                 Compositions <small>{rows.length} of {cat.index.pieces.length}</small>
               </h2>
-              <div className="co-filters">
-                <input type="search" placeholder="Search title…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search compositions" data-testid="co-search" />
-                <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category" data-testid="co-category">
-                  <option value="all">all categories</option>
-                  {categories.map((c) => (
-                    <option key={c} value={c}>
-                      {c.replace("_", " ")}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <ul className="co-pieces" data-testid="co-pieces">
-                {rows.map((p) => (
-                  <li key={p.id}>
-                    <button className={`co-piece${p.id === pieceId ? " active" : ""}`} onClick={() => setPieceId(p.id)} data-piece={p.id}>
-                      <b>{p.title}</b>
-                      <span>
-                        {p.category.replace("_", " ")} · {p.meter} · {p.bars} bars · {p.notes} notes
-                      </span>
-                      {p.status !== "ok" && <em title="the import reported something worth a look">⚠ notes on import</em>}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              {cat.index.failed.length > 0 && (
-                <div className="co-failed" data-testid="co-failed">
-                  <b>Not imported</b>
-                  {cat.index.failed.map((f) => (
-                    <p key={f.id}>
-                      {f.title}: <span className="muted">{f.reasons.join("; ")}</span>
-                    </p>
-                  ))}
-                </div>
-              )}
-              {cat.aggregate && <Overview agg={cat.aggregate} />}
-            </aside>
-
-            <div className="co-main">
-              {loadError && (
-                <div className="panel error" role="alert">
-                  {loadError}
-                </div>
-              )}
-              {!loaded && !loadError && <div className="panel muted">Loading…</div>}
-              {loaded && schedule && (
-                <>
-                  <section className="panel">
-                    <h2>
-                      {loaded.piece.title} <small>{loaded.piece.provenance.catalog.category?.replace("_", " ")} · {loaded.piece.measures[0]!.meter.text} · {loaded.line.bars.length} bars · {loaded.line.notes.length} notes</small>
-                    </h2>
-                    <div className="transport co-transport" aria-label="Transport">
-                      <button className="play" onClick={() => void toggle()} aria-label={playing ? "Pause" : "Play"} data-testid="co-play">
-                        {playing ? "⏸ Pause" : "▶ Play"}
-                      </button>
-                      <button onClick={rewind} aria-label="Stop and rewind">
-                        ⏹ Rewind
-                      </button>
-                      <label className="zoom">
-                        Tempo
-                        <input type="range" min={50} max={240} value={bpm} onChange={(e) => setBpm(Number(e.target.value))} aria-label="Tempo in quarter notes per minute" data-testid="co-bpm" />
-                        <b>{bpm}</b> quarter-notes/min
-                      </label>
-                      <label className="zoom">
-                        Zoom
-                        <input type="range" min={20} max={120} value={pxPerQuarter} onChange={(e) => setPxPerQuarter(Number(e.target.value))} />
-                      </label>
-                      <span className="muted" data-testid="co-audio">
-                        {audioMs === null ? "rendering…" : `rendered in ${audioMs} ms · looping`}
-                      </span>
-                    </div>
-                    <div className="co-level" role="group" aria-label="Phrase level">
-                      <span className="muted">Read as</span>
-                      {LEVELS.map((l) => (
-                        <button key={l.id} className={level === l.id ? "on" : ""} onClick={() => setLevel(l.id)} title={l.hint} data-testid={`co-level-${l.id}`}>
-                          {l.name}
-                        </button>
-                      ))}
-                      <label className="check">
-                        <input type="checkbox" checked={showFaint} onChange={(e) => setShowFaint(e.target.checked)} data-testid="co-faint" /> show weaker candidates
-                      </label>
-                      <span className="muted" data-testid="co-segcount">
-                        {segments.length} {LEVELS.find((l) => l.id === level)!.name}
-                      </span>
-                    </div>
-                    <div className="ph-legend co-legend">
-                      <i className="co-key short" /> short (≤ ½ beat) <i className="co-key mid" /> medium <i className="co-key long" /> sustained (≥ 1 beat) <i className="co-key rest" /> written rest <i className="co-key pad" /> suspected padding <i className="co-key hl" /> highlighted pattern
-                      <span className="muted"> · darker edge = stronger metric position · click a note, a phrase header or a boundary to inspect it</span>
-                    </div>
-                    <CorpusTimeline
-                      line={loaded.line}
-                      harmony={loaded.piece.harmony}
-                      segments={segments}
-                      boundaries={boundariesAt}
-                      faint={faint}
-                      selectedSegment={selSegment}
-                      selectedNote={selNote}
-                      selectedBoundary={selBoundary}
-                      highlight={new Set(highlight?.ids ?? [])}
-                      sounding={new Set(sounding)}
-                      pxPerQuarter={pxPerQuarter}
-                      playheadRef={playheadRef}
-                      scrollRef={scrollRef}
-                      onSelectNote={(id) => {
-                        setSelNote(id);
-                        setSelBoundary(null);
-                      }}
-                      onSelectSegment={(i) => {
-                        setSelSegment(i);
-                        setSelNote(null);
-                        setSelBoundary(null);
-                      }}
-                      onSelectBoundary={(i) => {
-                        setSelBoundary(i);
-                        setSelNote(null);
-                      }}
-                      onSeek={seekWhole}
-                    />
-                    {highlight && (
-                      <p className="co-hl-note" data-testid="co-highlight">
-                        Highlighting <b>{highlight.label}</b> ({highlight.ids.length} notes){" "}
-                        <button onClick={() => setHighlight(null)}>clear</button>
-                      </p>
-                    )}
-                  </section>
-
-                  {(selNoteObj || selBoundaryObj) && (
-                    <section className="panel co-inspect" data-testid="co-inspect">
-                      {selNoteObj && <NoteInspector line={loaded.line} id={selNoteObj.id} />}
-                      {selBoundaryObj && <BoundaryInspector c={selBoundaryObj} line={loaded.line} />}
-                    </section>
-                  )}
-
-                  {segment && profile && (
-                    <section className="panel co-phrase" data-testid="co-phrase">
-                      <h2>
-                        Phrase {segment.id} <small>{Math.round(segment.confidence * 100)}% confidence · a hypothesis, not a fact</small>
-                      </h2>
-                      <div className="co-phrase-grid">
-                        <div>
-                          <ContourSvg points={notePoints(segment)} width={260} height={74} label={`contour of ${segment.id}`} />
-                          <div className="muted">contour: <b>{profile.contour.kind}</b> <code>{profile.contour.shape}</code></div>
-                          <RhythmStrip {...rhythmTicks(segment)} width={260} label={`rhythm of ${segment.id}`} />
-                          <div className="muted">activity: <b>{profile.activityShape}</b> (attacks per third: {profile.activityThirds.join(" · ")})</div>
-                        </div>
-                        <table className="co-facts">
-                          <tbody>
-                            <tr><th>length</th><td>{profile.noteCount} notes · {profile.bars} bars · {profile.beats} beats · {profile.attacksPerBeat} attacks/beat</td></tr>
-                            <tr><th>register</th><td>MIDI {profile.range.lowest}–{profile.range.highest} (span {profile.range.span}), mean {profile.range.mean}</td></tr>
-                            <tr><th>opens</th><td>on a {WEIGHT_NAMES[String(profile.opening.firstWeight)]}{profile.opening.pickup ? " (pickup)" : ""}{profile.opening.afterRest ? ", after a written rest" : ""}</td></tr>
-                            <tr><th>ends</th><td>{profile.ending.finalBeats} beat(s) on a {WEIGHT_NAMES[String(profile.ending.finalWeight)]}; {profile.ending.finalInterval === null ? "no approach" : `${profile.ending.approach} by a ${profile.ending.finalIntervalClass} (${profile.ending.finalInterval} st)`}; {profile.ending.decelerates ? "decelerates" : "does not decelerate"}; {pct(profile.ending.shareOfPhrase)} of the phrase{profile.ending.followedByRest ? "; then a written rest" : ""}</td></tr>
-                          </tbody>
-                        </table>
-                      </div>
-                      <div className="co-actions">
-                        <button onClick={() => seekWhole(fnum(loaded.line.notes[segment.from]!.onset))} data-testid="co-play-from">Play from here</button>
-                        <button onClick={() => setPinned({ label: `${loaded.piece.title} · ${segment.id}`, profile })} data-testid="co-pin">Pin as A to compare</button>
-                      </div>
-                    </section>
-                  )}
-
-                  {pinned && (
-                    <section className="panel co-compare" data-testid="co-compare">
-                      <h2>
-                        Compare two phrases <small>A is pinned; B is the phrase selected now</small>
-                      </h2>
-                      <p>
-                        <b>A:</b> {pinned.label} <button onClick={() => setPinned(null)}>unpin</button>
-                      </p>
-                      {!comparison || !profile || !segment ? (
-                        <p className="muted">Select another phrase (in this piece or another) to compare it with A.</p>
-                      ) : (
-                        <div className="co-compare-body">
-                          <div className="co-two">
-                            <PhraseMini title={`A · ${pinned.label}`} profile={pinned.profile} />
-                            <PhraseMini title={`B · ${loaded.piece.title} · ${segment.id}`} profile={profile} />
-                          </div>
-                          <Bars
-                            testId="co-compare-bars"
-                            max={1}
-                            items={(Object.keys(comparison.aspects) as (keyof typeof comparison.aspects)[]).map((k) => ({ label: k, value: comparison.aspects[k], text: pct(comparison.aspects[k]) }))}
-                          />
-                          <p>
-                            Overall similarity <b>{pct(comparison.overall)}</b> · relation: <b>{comparison.relation.replace(/-/g, " ")}</b>
-                          </p>
-                          <ul>{comparison.statements.map((s, i) => <li key={i}>{s}</li>)}</ul>
-                        </div>
-                      )}
-                    </section>
-                  )}
-
-                  <section className="panel co-tabs">
-                    <div className="co-tablist" role="tablist">
-                      {(["rhythm", "melody", "phrases", "harmony", "source"] as Tab[]).map((t) => (
-                        <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? "on" : ""} onClick={() => setTab(t)} data-testid={`co-tab-${t}`}>
-                          {t === "source" ? "source & import" : t}
-                        </button>
-                      ))}
-                    </div>
-                    {tab === "rhythm" && <RhythmTab a={loaded.analysis} onHighlight={setHighlight} notesFrom={notesFrom} line={loaded.line} />}
-                    {tab === "melody" && <MelodyTab a={loaded.analysis} onHighlight={setHighlight} notesFrom={notesFrom} />}
-                    {tab === "phrases" && (
-                      <PhrasesTab
-                        a={loaded.analysis}
-                        level={level}
-                        segments={segments}
-                        profileOf={profileOf}
-                        selected={selSegment}
-                        onSelect={(i) => {
-                          setSelSegment(i);
-                          setSelNote(null);
-                          setSelBoundary(null);
-                        }}
-                        onBoundary={(i) => setSelBoundary(i)}
-                      />
-                    )}
-                    {tab === "harmony" && <HarmonyTab a={loaded.analysis} />}
-                    {tab === "source" && <SourceTab loaded={loaded} />}
-                  </section>
-                </>
-              )}
+              <span>
+                <button className="icon-btn" onClick={() => setModal("overview")} title="Statistics of the whole corpus" aria-label="Whole corpus" data-testid="co-overview-open">
+                  <Sigma {...IC} />
+                </button>
+              </span>
             </div>
+            <div className="co-filters">
+              <input type="search" placeholder="Search title…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search compositions" data-testid="co-search" />
+              <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category" data-testid="co-category">
+                <option value="all">all</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c.replace("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <ul className="co-pieces co2-pieces" data-testid="co-pieces">
+              {rows.map((p) => (
+                <li key={p.id}>
+                  <button className={`co-piece${p.id === pieceId ? " active" : ""}`} onClick={() => setPieceId(p.id)} data-piece={p.id}>
+                    <b>{p.title}</b>
+                    <span>
+                      {p.category.replace("_", " ")} · {p.meter} · {p.bars} bars · {p.notes} notes
+                    </span>
+                    {p.ir === false && <em title="no MusicIR projection: opens for analysis, cannot be played"><TriangleAlert {...IC_SM} /> analysis only</em>}
+                    {p.status !== "ok" && <em title="the import reported something worth a look"><TriangleAlert {...IC_SM} /> notes on import</em>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {cat.index.failed.length > 0 && (
+              <div className="co-failed" data-testid="co-failed">
+                <b>Not imported</b>
+                {cat.index.failed.map((f) => (
+                  <p key={f.id}>
+                    {f.title}: <span className="muted">{f.reasons.join("; ")}</span>
+                  </p>
+                ))}
+              </div>
+            )}
+          </aside>
+
+          <div className="co2-main">
+            <p className="banner co2-licence" role="note" data-testid="co-notice">
+              <span>
+                <b>Research-only data (GPL-3.0).</b> Keep it out of commercial releases.
+              </span>
+              <button className="btn small" onClick={() => setModal("licence")} data-testid="co-licence-open">
+                Licence &amp; provenance
+              </button>
+            </p>
+            {loadError && (
+              <div className="banner error" role="alert">
+                {loadError}
+              </div>
+            )}
+            {!loaded && !loadError && <div className="stage-empty">Loading…</div>}
+            {loaded && (
+              <div className={`co2-loaded${stale ? " is-stale" : ""}`} aria-busy={stale} data-testid="co-loaded" data-stale={stale ? "1" : "0"}>
+                {stale && (
+                  <p className="banner" role="status" data-testid="co-stale">
+                    Loading the next piece… what is shown below is still <b>{loaded.piece.title}</b>.
+                  </p>
+                )}
+                {!doc && (
+                  <p className="banner" role="note" data-testid="co-analysis-only">
+                    <span>
+                      <b>Analysis only.</b> This piece has no MusicIR projection{loaded.report?.irLoss.length ? ` (${loaded.report.irLoss.join("; ")})` : ""}, so it is shown and analysed from the notation but <b>cannot be played</b>, and it has no audio.
+                    </span>
+                  </p>
+                )}
+                <header className="co2-head">
+                  <div className="co2-title">
+                    <h2>{loaded.piece.title}</h2>
+                    <span className="muted">
+                      {loaded.piece.provenance.catalog.category?.replace("_", " ")} · {loaded.piece.measures[0]!.meter.text} · {loaded.line.bars.length} bars · {loaded.line.notes.length} notes
+                    </span>
+                  </div>
+                  <div className="co2-head-right">
+                    <span className="muted">Read as</span>
+                    <Tabs label="Phrase level" value={level} onChange={setLevel} tabs={LEVELS.map((l) => ({ id: l.id, label: l.name, testId: `co-level-${l.id}` }))} />
+                    <label className="co2-check">
+                      <input type="checkbox" checked={showFaint} onChange={(e) => setShowFaint(e.target.checked)} data-testid="co-faint" /> weaker candidates
+                    </label>
+                    <span className="muted" data-testid="co-segcount">
+                      {segments.length} {LEVELS.find((l) => l.id === level)!.name}
+                    </span>
+                    {highlight && (
+                      <span className="lock-chip" data-testid="co-highlight">
+                        <span>
+                          Highlighting <b>{highlight.label}</b> ({highlight.ids.length} notes)
+                        </span>
+                        <button onClick={() => setHighlight(null)} aria-label="Clear highlight">
+                          <X {...IC_SM} />
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                </header>
+
+                <section className="card co2-tl">
+                  <div className="ph-legend co-legend">
+                    <i className="co-key short" /> short (≤ ½ beat) <i className="co-key mid" /> medium <i className="co-key long" /> sustained (≥ 1 beat) <i className="co-key rest" /> written rest <i className="co-key pad" /> suspected padding <i className="co-key hl" /> highlighted pattern
+                    <span className="muted"> · darker edge = stronger metric position · click a note, a phrase header or a boundary</span>
+                  </div>
+                  <CorpusTimeline
+                    line={loaded.line}
+                    harmony={loaded.piece.harmony}
+                    segments={segments}
+                    boundaries={boundariesAt}
+                    faint={faint}
+                    selectedSegment={selSegment}
+                    selectedNote={selNote}
+                    selectedBoundary={selBoundary}
+                    highlight={new Set(highlight?.ids ?? [])}
+                    sounding={new Set(sounding)}
+                    pxPerQuarter={pxPerQuarter}
+                    playheadRef={playheadRef}
+                    scrollRef={scrollRef}
+                    onSelectNote={pickNote}
+                    onSelectSegment={pickSegment}
+                    onSelectBoundary={pickBoundary}
+                    onSeek={seekWhole}
+                  />
+                </section>
+
+                <div className="co2-bottom">
+                  <section className="card co2-panel" aria-label="Analysis">
+                    <div className="co2-panel-head">
+                      <Tabs
+                        label="Analysis"
+                        value={tab}
+                        onChange={setTab}
+                        tabs={(["rhythm", "melody", "phrases", "harmony", "source"] as Tab[]).map((t) => ({ id: t, label: t === "source" ? "source & import" : t, testId: `co-tab-${t}` }))}
+                      />
+                    </div>
+                    <div className="co2-panel-body">
+                      {tab === "rhythm" && <RhythmTab a={loaded.analysis} onHighlight={setHighlight} notesFrom={notesFrom} line={loaded.line} />}
+                      {tab === "melody" && <MelodyTab a={loaded.analysis} onHighlight={setHighlight} notesFrom={notesFrom} />}
+                      {tab === "phrases" && <PhrasesTab a={loaded.analysis} level={level} segments={segments} profileOf={profileOf} selected={selSegment} onSelect={pickSegment} onBoundary={pickBoundary} />}
+                      {tab === "harmony" && <HarmonyTab a={loaded.analysis} />}
+                      {tab === "source" && <SourceTab loaded={loaded} />}
+                    </div>
+                  </section>
+
+                  <section className="card co2-panel" aria-label="Selection">
+                    <div className="co2-panel-head">
+                      <Tabs
+                        label="Selection"
+                        value={rightTab}
+                        onChange={setRightTab}
+                        tabs={[
+                          { id: "phrase", label: "Phrase", testId: "co-rtab-phrase" },
+                          { id: "compare", label: pinned ? <>Compare <Pin {...IC_SM} /></> : "Compare", testId: "co-rtab-compare" },
+                          { id: "inspect", label: "Inspect", testId: "co-rtab-inspect" },
+                        ]}
+                      />
+                    </div>
+                    <div className="co2-panel-body">
+                      {rightTab === "phrase" &&
+                        (segment && profile ? (
+                          <div data-testid="co-phrase">
+                            <h3 className="co2-h">
+                              Phrase {segment.id} <small className="muted" title="Product of the strengths of its two boundaries. A heuristic score; it has not been checked against phrases marked by people, so it is not a probability.">boundary strength {Math.round(segment.confidence * 100)}% · heuristic, uncalibrated · a hypothesis, not a fact</small>
+                            </h3>
+                            <div className="co-phrase-grid">
+                              <div>
+                                <ContourSvg points={notePoints(segment)} width={240} height={70} label={`contour of ${segment.id}`} />
+                                <div className="muted">contour: <b>{profile.contour.kind}</b> <code>{profile.contour.shape}</code></div>
+                                <RhythmStrip {...rhythmTicks(segment)} width={240} label={`rhythm of ${segment.id}`} />
+                                <div className="muted">activity: <b>{profile.activityShape}</b> (attacks per third: {profile.activityThirds.join(" · ")})</div>
+                              </div>
+                              <table className="co-facts">
+                                <tbody>
+                                  <tr><th>length</th><td>{profile.noteCount} notes · {profile.bars} bars · {profile.beats} beats · {profile.attacksPerBeat} attacks/beat</td></tr>
+                                  <tr><th>register</th><td>MIDI {profile.range.lowest}–{profile.range.highest} (span {profile.range.span}), mean {profile.range.mean}</td></tr>
+                                  <tr><th>opens</th><td>on a {WEIGHT_NAMES[String(profile.opening.firstWeight)]}{profile.opening.pickup ? " (pickup)" : ""}{profile.opening.afterRest ? ", after a written rest" : ""}</td></tr>
+                                  <tr><th>ends</th><td>{profile.ending.finalBeats} beat(s) on a {WEIGHT_NAMES[String(profile.ending.finalWeight)]}; {profile.ending.finalInterval === null ? "no approach" : `${profile.ending.approach} by a ${profile.ending.finalIntervalClass} (${profile.ending.finalInterval} st)`}; {profile.ending.decelerates ? "decelerates" : "does not decelerate"}; {pct(profile.ending.shareOfPhrase)} of the phrase{profile.ending.followedByRest ? "; then a written rest" : ""}</td></tr>
+                                </tbody>
+                              </table>
+                            </div>
+                            <div className="co-actions">
+                              <button className="btn small" onClick={() => void playPhrase(segment)} disabled={!doc} title={doc ? (loop ? "Repeat this phrase" : "Play this phrase once") : "No MusicIR for this piece"} data-testid="co-play-phrase">
+                                <Play {...IC_SM} /> Play phrase{loop ? " (loop)" : ""}
+                              </button>
+                              {region && (
+                                <button className="btn small" onClick={() => setRegion(null)} data-testid="co-region-clear" title="Go back to playing the whole piece">
+                                  <X {...IC_SM} /> Whole piece
+                                </button>
+                              )}
+                              <button className="btn small" onClick={() => seekWhole(fnum(loaded.line.notes[segment.from]!.onset))} disabled={!doc} data-testid="co-play-from" title="Only moves the playhead; press Play to hear it">Move playhead here</button>
+                              <button
+                                className="btn small"
+                                onClick={() => {
+                                  setPinned({ label: `${loaded.piece.title} · ${segment.id}`, profile });
+                                  setRightTab("compare");
+                                }}
+                                data-testid="co-pin"
+                              >
+                                Pin as A to compare
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="hint">Click a phrase header on the timeline (or a row in the Phrases tab) to see its contour, rhythm, opening and ending.</p>
+                        ))}
+                      {rightTab === "compare" &&
+                        (pinned ? (
+                          <div data-testid="co-compare">
+                            <h3 className="co2-h">
+                              Compare two phrases <small className="muted">A is pinned; B is the phrase selected now</small>
+                            </h3>
+                            <p>
+                              <b>A:</b> {pinned.label} <button className="btn small" onClick={() => setPinned(null)}>unpin</button>
+                            </p>
+                            {!comparison || !profile || !segment ? (
+                              <p className="hint">Select another phrase (in this piece or another) to compare it with A.</p>
+                            ) : (
+                              <div className="co-compare-body">
+                                <div className="co-two">
+                                  <PhraseMini title={`A · ${pinned.label}`} profile={pinned.profile} />
+                                  <PhraseMini title={`B · ${loaded.piece.title} · ${segment.id}`} profile={profile} />
+                                </div>
+                                <Bars testId="co-compare-bars" max={1} items={(Object.keys(comparison.aspects) as (keyof typeof comparison.aspects)[]).map((k) => ({ label: k, value: comparison.aspects[k], text: pct(comparison.aspects[k]) }))} />
+                                <p>
+                                  Overall similarity <b>{pct(comparison.overall)}</b> · relation: <b>{comparison.relation.replace(/-/g, " ")}</b>
+                                </p>
+                                <ul>{comparison.statements.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="hint">Select a phrase, press “Pin as A to compare”, then select another phrase.</p>
+                        ))}
+                      {rightTab === "inspect" &&
+                        (selNoteObj || selBoundaryObj ? (
+                          <div data-testid="co-inspect">
+                            {selNoteObj && <NoteInspector line={loaded.line} id={selNoteObj.id} />}
+                            {selBoundaryObj && <BoundaryInspector c={selBoundaryObj} line={loaded.line} />}
+                          </div>
+                        ) : (
+                          <p className="hint">Click a note or a boundary line on the timeline to see its place in the bar, its harmony, or the evidence behind it.</p>
+                        ))}
+                    </div>
+                  </section>
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}
-    </main>
+
+      <Modal open={modal === "overview"} onClose={closeModal} title="Whole corpus" size="wide" testId="co-overview-modal">
+        {cat?.aggregate ? <Overview agg={cat.aggregate} /> : <p className="hint">No pooled statistics.</p>}
+      </Modal>
+      <Modal open={modal === "licence"} onClose={closeModal} title="Licence and provenance" testId="co-licence-modal">
+        {cat?.index && (
+          <>
+            <p>{cat.index.notice}</p>
+            <table className="co-facts">
+              <tbody>
+                <tr><th>corpus</th><td>{cat.index.corpus.name}</td></tr>
+                <tr><th>licence</th><td>{cat.index.corpus.license}</td></tr>
+                {cat.index.corpus.repository && (
+                  <tr><th>source</th><td><a href={cat.index.corpus.repository} target="_blank" rel="noreferrer">{cat.index.corpus.repository}</a></td></tr>
+                )}
+              </tbody>
+            </table>
+            <p className="hint">This data is served only to this machine and is not part of the repository or the app bundle.</p>
+          </>
+        )}
+      </Modal>
+    </div>
   );
 }
 
@@ -574,8 +705,7 @@ function Overview({ agg }: { agg: corpus.CorpusAggregate }) {
   const p = agg.pooled;
   const dur = Object.entries(p.rhythm.durationShare).slice(0, 5);
   return (
-    <details className="co-overview" data-testid="co-overview">
-      <summary>Whole corpus ({p.pieces} pieces, {p.notes} notes)</summary>
+    <div className="co-overview" data-testid="co-overview">
       <div className="co-figs">
         <Fig k="notes in runs of 8+ short notes" v={pct(p.rhythm.shortRuns.shareOfNotesInRunsOf8Plus)} />
         <Fig k="bursts ending held / on a rest" v={pct(p.melody.joint.burstThenHoldShare)} />
@@ -584,7 +714,7 @@ function Overview({ agg }: { agg: corpus.CorpusAggregate }) {
         <Fig k="phrase length" v={`${p.phrases.barsPerPhrase.median} bars median`} />
       </div>
       <Bars items={dur.map(([d, v]) => ({ label: d, value: v, text: pct(v) }))} />
-    </details>
+    </div>
   );
 }
 
@@ -612,7 +742,7 @@ function BoundaryInspector({ c, line }: { c: corpus.BoundaryHypothesis; line: co
   return (
     <div data-testid="co-boundary-inspect">
       <h2>
-        Boundary after note {c.afterNote} <small>score {Math.round(c.score * 100)}% · {c.level} · {c.independentKinds} kind(s) of evidence · bar {line.bars[c.bar]!.number}</small>
+        Boundary after note {c.afterNote} <small>strength {Math.round(c.score * 100)}% (heuristic) · {c.level} · {c.independentKinds} kind(s) of evidence · bar {line.bars[c.bar]!.number}</small>
       </h2>
       <p className="muted">A boundary is a hypothesis: these are the cues that support it, each scored 0–1 and combined without any single one deciding.</p>
       <ul className="co-evidence">
@@ -771,7 +901,7 @@ function PhrasesTab({ a, level, segments, profileOf, selected, onSelect, onBound
       </p>
       <table className="co-table" data-testid="co-phrase-table">
         <thead>
-          <tr><th>unit</th><th>notes</th><th>bars</th><th>activity</th><th>contour</th><th>final note</th><th>confidence</th></tr>
+          <tr><th>unit</th><th>notes</th><th>bars</th><th>activity</th><th>contour</th><th>final note</th><th title="heuristic boundary strength, not a calibrated probability">boundary strength</th></tr>
         </thead>
         <tbody>
           {segments.map((s, i) => {
@@ -783,7 +913,7 @@ function PhrasesTab({ a, level, segments, profileOf, selected, onSelect, onBound
                 <td>{pr.bars}</td>
                 <td>{pr.activityShape}</td>
                 <td>{pr.contour.kind}</td>
-                <td>{pr.ending.finalBeats} beat{pr.ending.decelerates ? " ↓" : ""}</td>
+                <td>{pr.ending.finalBeats} beat{pr.ending.decelerates ? <ArrowDown {...IC_SM} /> : null}</td>
                 <td>{pct(s.confidence)}</td>
               </tr>
             );
