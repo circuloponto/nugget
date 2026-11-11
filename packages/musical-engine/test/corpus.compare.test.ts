@@ -128,8 +128,8 @@ describe("comparing the generator with the corpus", () => {
   it("reports every metric once, finite, with spreads, subsets and a verdict", () => {
     expect(result.rows.map((r) => r.id)).toEqual(corpus.METRICS.map((m) => m.id));
     for (const r of result.rows) {
-      for (const v of [r.generator, r.corpus, r.corpusFourFour, r.corpusDevelopment, r.corpusHeldOut, ...r.generatorSpread, ...r.corpusSpread]) expect(Number.isFinite(v), r.id).toBe(true);
-      expect(["within", "above", "below"]).toContain(r.verdict);
+      for (const v of [r.generator, r.corpus, r.corpusFourFour, r.corpusDevelopment, r.corpusHeldOut, ...(r.generatorSpread ?? []), ...(r.corpusSpread ?? [])]) expect(v === null || Number.isFinite(v), r.id).toBe(true);
+      expect(["within", "above", "below", null]).toContain(r.verdict);
     }
     expect(result.sample).toMatchObject({ runs: 4, failedRuns: 0, keys: ["C"], meter: "4/4" });
     expect(result.corpus).toMatchObject({ pieces: 4, fourFourPieces: 4 });

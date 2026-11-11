@@ -15,3 +15,6 @@ export * from "./analysis/analyze";
 export * from "./split";
 export * from "./generatorSample";
 export * from "./compare";
+export * from "./profile";
+export * from "./generatorB";
+export * from "./abStudy";

@@ -15,6 +15,7 @@
     "build": "npm run build:engine && npm run build -w musical-lab-app",
     "verify": "npm run test && npm run typecheck && npm run build",
     "corpus": "npm run build:engine && node scripts/corpus.mjs",
-    "compare": "npm run build:engine && node scripts/compare.mjs"
+    "compare": "npm run build:engine && node scripts/compare.mjs",
+    "ab": "npm run build:engine && node scripts/ab.mjs"
   }
 }

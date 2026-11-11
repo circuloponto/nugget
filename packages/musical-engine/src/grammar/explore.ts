@@ -419,7 +419,7 @@ function rhythmCharacterOf(plan: RhythmPlan): string {
   return parts.length ? parts.join(" + ") : t.tags.includes("sparse") ? "broad" : "even";
 }
 
-function traitsOf(c: PhraseCandidate, spec: PhraseSpec, ix: Intention, strategy: Strategy): Traits {
+export function traitsOf(c: PhraseCandidate, spec: PhraseSpec, ix: Intention, strategy: Strategy): Traits {
   const notes = notesOf(c.events as never);
   const target = notes[notes.length - 1]!;
   const pitches: Pitch[] = [...c.choices.pitches];

@@ -1,0 +1,5881 @@
+{
+  "schema": "nugget-ab-study",
+  "version": 1,
+  "id": "ab-3df9187114",
+  "config": {
+    "keys": [
+      "C",
+      "D",
+      "Eb",
+      "F",
+      "G",
+      "A"
+    ],
+    "seeds": [
+      1,
+      2,
+      3
+    ],
+    "phrasesPerRun": 4,
+    "pairs": 12,
+    "seed": 1
+  },
+  "questions": [
+    {
+      "id": "musical",
+      "text": "Which sounds more musical?"
+    },
+    {
+      "id": "coherent",
+      "text": "Which sounds more like a phrase that belongs to a tune: one idea, not a string of notes?"
+    }
+  ],
+  "pairs": [
+    {
+      "id": "p01",
+      "key": "C",
+      "mode": "major",
+      "x": {
+        "ir": {
+          "version": 1,
+          "id": "p01-x",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F3",
+                "midi": 53
+              },
+              "onset": "1/2",
+              "duration": "3/16",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 2,
+                "fret": 3
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "A3",
+                "midi": 57
+              },
+              "onset": "11/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 2
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G3",
+                "midi": 55
+              },
+              "onset": "3/4",
+              "duration": "1",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "eleventh",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F3",
+                "midi": 53
+              },
+              "onset": "7/4",
+              "duration": "1/8",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 2,
+                "fret": 3
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G3",
+                "midi": 55
+              },
+              "onset": "15/8",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F3",
+                "midi": 53
+              },
+              "onset": "31/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "lower-diatonic-neighbor",
+                "metric": "subdivision",
+                "structural": "approach-note"
+              },
+              "instrument": {
+                "string": 2,
+                "fret": 3
+              }
+            },
+            {
+              "id": "n-mel-7",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G3",
+                "midi": 55
+              },
+              "onset": "2",
+              "duration": "1/2",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 0
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Dm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "D",
+              "tones": [
+                "D",
+                "F",
+                "A",
+                "C"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "G7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "G",
+              "tones": [
+                "G",
+                "B",
+                "D",
+                "F"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Cmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "C",
+              "tones": [
+                "C",
+                "E",
+                "G",
+                "B"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 7,
+        "beats": 10
+      },
+      "y": {
+        "ir": {
+          "version": 1,
+          "id": "p01-y",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G4",
+                "midi": 67
+              },
+              "onset": "3/2",
+              "duration": "1/16",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 8
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F4",
+                "midi": 65
+              },
+              "onset": "25/16",
+              "duration": "3/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 6
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D4",
+                "midi": 62
+              },
+              "onset": "7/4",
+              "duration": "1/16",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 7
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "B3",
+                "midi": 59
+              },
+              "onset": "29/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C#4",
+                "midi": 61
+              },
+              "onset": "15/8",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "eleventh",
+                "melodic": "lower-chromatic-neighbor",
+                "metric": "offbeat",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 2
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Eb4",
+                "midi": 63
+              },
+              "onset": "31/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "thirteenth",
+                "melodic": "upper-chromatic-neighbor",
+                "metric": "subdivision",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 4
+              }
+            },
+            {
+              "id": "n-mel-7",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D4",
+                "midi": 62
+              },
+              "onset": "2",
+              "duration": "1",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "ninth",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 3
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Dm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "D",
+              "tones": [
+                "D",
+                "F",
+                "A",
+                "C"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "G7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "G",
+              "tones": [
+                "G",
+                "B",
+                "D",
+                "F"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Cmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "C",
+              "tones": [
+                "C",
+                "E",
+                "G",
+                "B"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 7,
+        "beats": 12
+      }
+    },
+    {
+      "id": "p02",
+      "key": "C",
+      "mode": "major",
+      "x": {
+        "ir": {
+          "version": 1,
+          "id": "p02-x",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D4",
+                "midi": 62
+              },
+              "onset": "1",
+              "duration": "1/8",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arpeggio-tone",
+                "metric": "downbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 3
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "B3",
+                "midi": 59
+              },
+              "onset": "9/8",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G3",
+                "midi": 55
+              },
+              "onset": "19/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D4",
+                "midi": 62
+              },
+              "onset": "5/4",
+              "duration": "1/2",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "upper-diatonic-neighbor",
+                "metric": "beat",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 7
+              }
+            },
+            {
+              "id": "r-mel-1",
+              "kind": "rest",
+              "voice": "melody",
+              "onset": "7/4",
+              "duration": "1/8"
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "B3",
+                "midi": 59
+              },
+              "onset": "15/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "lower-diatonic-neighbor",
+                "metric": "offbeat",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C4",
+                "midi": 60
+              },
+              "onset": "2",
+              "duration": "1",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 1
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Dm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "D",
+              "tones": [
+                "D",
+                "F",
+                "A",
+                "C"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "G7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "G",
+              "tones": [
+                "G",
+                "B",
+                "D",
+                "F"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Cmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "C",
+              "tones": [
+                "C",
+                "E",
+                "G",
+                "B"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 6,
+        "beats": 12
+      },
+      "y": {
+        "ir": {
+          "version": 1,
+          "id": "p02-y",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F3",
+                "midi": 53
+              },
+              "onset": "1",
+              "duration": "1/8",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "downbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 2,
+                "fret": 3
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "A3",
+                "midi": 57
+              },
+              "onset": "9/8",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "ninth",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 2
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "B3",
+                "midi": 59
+              },
+              "onset": "19/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Db4",
+                "midi": 61
+              },
+              "onset": "5/4",
+              "duration": "1/2",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "melodic": "upper-chromatic-neighbor",
+                "metric": "beat",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 2
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "B3",
+                "midi": 59
+              },
+              "onset": "7/4",
+              "duration": "1/4",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "lower-chromatic-neighbor",
+                "metric": "beat",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C4",
+                "midi": 60
+              },
+              "onset": "2",
+              "duration": "1/4",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 1
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Dm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "D",
+              "tones": [
+                "D",
+                "F",
+                "A",
+                "C"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "G7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "G",
+              "tones": [
+                "G",
+                "B",
+                "D",
+                "F"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Cmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "C",
+              "tones": [
+                "C",
+                "E",
+                "G",
+                "B"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 6,
+        "beats": 9
+      }
+    },
+    {
+      "id": "p03",
+      "key": "C",
+      "mode": "major",
+      "x": {
+        "ir": {
+          "version": 1,
+          "id": "p03-x",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F4",
+                "midi": 65
+              },
+              "onset": "1/2",
+              "duration": "3/8",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 10
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "A4",
+                "midi": 69
+              },
+              "onset": "7/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 10
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "B4",
+                "midi": 71
+              },
+              "onset": "1",
+              "duration": "1/8",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "downbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 12
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G4",
+                "midi": 67
+              },
+              "onset": "9/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 12
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F4",
+                "midi": 65
+              },
+              "onset": "5/4",
+              "duration": "1/2",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 10
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G4",
+                "midi": 67
+              },
+              "onset": "7/4",
+              "duration": "1/4",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "lower-diatonic-neighbor",
+                "metric": "beat",
+                "structural": "approach-note"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 12
+              }
+            },
+            {
+              "id": "n-mel-7",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "A4",
+                "midi": 69
+              },
+              "onset": "2",
+              "duration": "1/4",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "thirteenth",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 14
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Dm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "D",
+              "tones": [
+                "D",
+                "F",
+                "A",
+                "C"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "G7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "G",
+              "tones": [
+                "G",
+                "B",
+                "D",
+                "F"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Cmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "C",
+              "tones": [
+                "C",
+                "E",
+                "G",
+                "B"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 7,
+        "beats": 9
+      },
+      "y": {
+        "ir": {
+          "version": 1,
+          "id": "p03-y",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D5",
+                "midi": 74
+              },
+              "onset": "1/2",
+              "duration": "1/4",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 15
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C5",
+                "midi": 72
+              },
+              "onset": "3/4",
+              "duration": "1/8",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 13
+              }
+            },
+            {
+              "id": "r-mel-1",
+              "kind": "rest",
+              "voice": "melody",
+              "onset": "7/8",
+              "duration": "1/8"
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "B4",
+                "midi": 71
+              },
+              "onset": "1",
+              "duration": "1/12",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "downbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 12
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D5",
+                "midi": 74
+              },
+              "onset": "13/12",
+              "duration": "1/12",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 10
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D#5",
+                "midi": 75
+              },
+              "onset": "7/6",
+              "duration": "1/12",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "melodic": "lower-chromatic-neighbor",
+                "metric": "subdivision",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 11
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F5",
+                "midi": 77
+              },
+              "onset": "5/4",
+              "duration": "1/2",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "upper-chromatic-neighbor",
+                "metric": "beat",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 13
+              }
+            },
+            {
+              "id": "r-mel-2",
+              "kind": "rest",
+              "voice": "melody",
+              "onset": "7/4",
+              "duration": "1/4"
+            },
+            {
+              "id": "n-mel-7",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "E5",
+                "midi": 76
+              },
+              "onset": "2",
+              "duration": "1",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 12
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Dm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "D",
+              "tones": [
+                "D",
+                "F",
+                "A",
+                "C"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "G7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "G",
+              "tones": [
+                "G",
+                "B",
+                "D",
+                "F"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Cmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "C",
+              "tones": [
+                "C",
+                "E",
+                "G",
+                "B"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 7,
+        "beats": 12
+      }
+    },
+    {
+      "id": "p04",
+      "key": "D",
+      "mode": "major",
+      "x": {
+        "ir": {
+          "version": 1,
+          "id": "p04-x",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "E4",
+                "midi": 64
+              },
+              "onset": "1/2",
+              "duration": "1/8",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D4",
+                "midi": 62
+              },
+              "onset": "5/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 3
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "B3",
+                "midi": 59
+              },
+              "onset": "3/4",
+              "duration": "1/8",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G3",
+                "midi": 55
+              },
+              "onset": "7/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "A3",
+                "midi": 57
+              },
+              "onset": "1",
+              "duration": "1/8",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "downbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 2
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G3",
+                "midi": 55
+              },
+              "onset": "9/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-7",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "A3",
+                "midi": 57
+              },
+              "onset": "5/4",
+              "duration": "1/8",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 2
+              }
+            },
+            {
+              "id": "n-mel-8",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C#4",
+                "midi": 61
+              },
+              "onset": "11/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 2
+              }
+            },
+            {
+              "id": "n-mel-9",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "E4",
+                "midi": 64
+              },
+              "onset": "3/2",
+              "duration": "1/8",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-10",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "A#4",
+                "midi": 70
+              },
+              "onset": "13/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "melodic": "lower-chromatic-neighbor",
+                "metric": "offbeat",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 6
+              }
+            },
+            {
+              "id": "n-mel-11",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C5",
+                "midi": 72
+              },
+              "onset": "7/4",
+              "duration": "1/4",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "melodic": "upper-chromatic-neighbor",
+                "metric": "beat",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 8
+              }
+            },
+            {
+              "id": "n-mel-12",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "B4",
+                "midi": 71
+              },
+              "onset": "2",
+              "duration": "1/2",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "thirteenth",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 7
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Em7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "E",
+              "tones": [
+                "E",
+                "G",
+                "B",
+                "D"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "A7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "A",
+              "tones": [
+                "A",
+                "C#",
+                "E",
+                "G"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Dmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "D",
+              "tones": [
+                "D",
+                "F#",
+                "A",
+                "C#"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 12,
+        "beats": 10
+      },
+      "y": {
+        "ir": {
+          "version": 1,
+          "id": "p04-y",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G4",
+                "midi": 67
+              },
+              "onset": "3/2",
+              "duration": "3/16",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 3
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C#4",
+                "midi": 61
+              },
+              "onset": "27/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 2
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G3",
+                "midi": 55
+              },
+              "onset": "7/4",
+              "duration": "1/16",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C#4",
+                "midi": 61
+              },
+              "onset": "29/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 2,
+                "fret": 11
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G4",
+                "midi": 67
+              },
+              "onset": "15/8",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 12
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G#4",
+                "midi": 68
+              },
+              "onset": "31/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "melodic": "lower-chromatic-neighbor",
+                "metric": "subdivision",
+                "structural": "approach-note"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 13
+              }
+            },
+            {
+              "id": "n-mel-7",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "A4",
+                "midi": 69
+              },
+              "onset": "2",
+              "duration": "1",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 14
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Em7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "E",
+              "tones": [
+                "E",
+                "G",
+                "B",
+                "D"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "A7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "A",
+              "tones": [
+                "A",
+                "C#",
+                "E",
+                "G"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Dmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "D",
+              "tones": [
+                "D",
+                "F#",
+                "A",
+                "C#"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 7,
+        "beats": 12
+      }
+    },
+    {
+      "id": "p05",
+      "key": "D",
+      "mode": "major",
+      "x": {
+        "ir": {
+          "version": 1,
+          "id": "p05-x",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D4",
+                "midi": 62
+              },
+              "onset": "1/2",
+              "duration": "3/8",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 3
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "E4",
+                "midi": 64
+              },
+              "onset": "7/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G4",
+                "midi": 67
+              },
+              "onset": "1",
+              "duration": "1/8",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "downbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 3
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "A4",
+                "midi": 69
+              },
+              "onset": "9/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 5
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G4",
+                "midi": 67
+              },
+              "onset": "5/4",
+              "duration": "1/2",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "upper-chromatic-neighbor",
+                "metric": "beat",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 3
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F4",
+                "midi": 65
+              },
+              "onset": "7/4",
+              "duration": "1/4",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "thirteenth",
+                "melodic": "lower-chromatic-neighbor",
+                "metric": "beat",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 1
+              }
+            },
+            {
+              "id": "n-mel-7",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F#4",
+                "midi": 66
+              },
+              "onset": "2",
+              "duration": "3/4",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 2
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Em7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "E",
+              "tones": [
+                "E",
+                "G",
+                "B",
+                "D"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "A7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "A",
+              "tones": [
+                "A",
+                "C#",
+                "E",
+                "G"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Dmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "D",
+              "tones": [
+                "D",
+                "F#",
+                "A",
+                "C#"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 7,
+        "beats": 11
+      },
+      "y": {
+        "ir": {
+          "version": 1,
+          "id": "p05-y",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G4",
+                "midi": 67
+              },
+              "onset": "1/2",
+              "duration": "1/4",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 12
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "B4",
+                "midi": 71
+              },
+              "onset": "3/4",
+              "duration": "1",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 12
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C#5",
+                "midi": 73
+              },
+              "onset": "7/4",
+              "duration": "1/16",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 14
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "E5",
+                "midi": 76
+              },
+              "onset": "29/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 12
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F5",
+                "midi": 77
+              },
+              "onset": "15/8",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "thirteenth",
+                "melodic": "lower-chromatic-neighbor",
+                "metric": "offbeat",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 13
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G5",
+                "midi": 79
+              },
+              "onset": "31/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "upper-chromatic-neighbor",
+                "metric": "subdivision",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 15
+              }
+            },
+            {
+              "id": "n-mel-7",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F#5",
+                "midi": 78
+              },
+              "onset": "2",
+              "duration": "1",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 14
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Em7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "E",
+              "tones": [
+                "E",
+                "G",
+                "B",
+                "D"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "A7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "A",
+              "tones": [
+                "A",
+                "C#",
+                "E",
+                "G"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Dmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "D",
+              "tones": [
+                "D",
+                "F#",
+                "A",
+                "C#"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 7,
+        "beats": 12
+      }
+    },
+    {
+      "id": "p06",
+      "key": "D",
+      "mode": "major",
+      "x": {
+        "ir": {
+          "version": 1,
+          "id": "p06-x",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "r-mel-1",
+              "kind": "rest",
+              "voice": "melody",
+              "onset": "1",
+              "duration": "1/8"
+            },
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G4",
+                "midi": 67
+              },
+              "onset": "9/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 3
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G4",
+                "midi": 67
+              },
+              "onset": "5/4",
+              "duration": "1/2",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 3
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G4",
+                "midi": 67
+              },
+              "onset": "7/4",
+              "duration": "1/12",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 3
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C#4",
+                "midi": 61
+              },
+              "onset": "11/6",
+              "duration": "1/12",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 2
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Eb4",
+                "midi": 63
+              },
+              "onset": "23/12",
+              "duration": "1/12",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "melodic": "upper-chromatic-neighbor",
+                "metric": "subdivision",
+                "structural": "approach-note"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 4
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D4",
+                "midi": 62
+              },
+              "onset": "2",
+              "duration": "1",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 3
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Em7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "E",
+              "tones": [
+                "E",
+                "G",
+                "B",
+                "D"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "A7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "A",
+              "tones": [
+                "A",
+                "C#",
+                "E",
+                "G"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Dmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "D",
+              "tones": [
+                "D",
+                "F#",
+                "A",
+                "C#"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 6,
+        "beats": 12
+      },
+      "y": {
+        "ir": {
+          "version": 1,
+          "id": "p06-y",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "A4",
+                "midi": 69
+              },
+              "onset": "3/2",
+              "duration": "1/8",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 10
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G4",
+                "midi": 67
+              },
+              "onset": "13/8",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 8
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "A4",
+                "midi": 69
+              },
+              "onset": "27/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 10
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D5",
+                "midi": 74
+              },
+              "onset": "7/4",
+              "duration": "1/8",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "melodic": "lower-diatonic-neighbor",
+                "metric": "beat",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 10
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F5",
+                "midi": 77
+              },
+              "onset": "15/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "thirteenth",
+                "melodic": "upper-chromatic-neighbor",
+                "metric": "offbeat",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 13
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "E5",
+                "midi": 76
+              },
+              "onset": "2",
+              "duration": "3/8",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "ninth",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 12
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Em7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "E",
+              "tones": [
+                "E",
+                "G",
+                "B",
+                "D"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "A7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "A",
+              "tones": [
+                "A",
+                "C#",
+                "E",
+                "G"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Dmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "D",
+              "tones": [
+                "D",
+                "F#",
+                "A",
+                "C#"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 6,
+        "beats": 9.5
+      }
+    },
+    {
+      "id": "p07",
+      "key": "Eb",
+      "mode": "major",
+      "x": {
+        "ir": {
+          "version": 1,
+          "id": "p07-x",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Ab4",
+                "midi": 68
+              },
+              "onset": "1/2",
+              "duration": "1/4",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 9
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Ab4",
+                "midi": 68
+              },
+              "onset": "3/4",
+              "duration": "3/8",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 9
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb4",
+                "midi": 70
+              },
+              "onset": "9/8",
+              "duration": "3/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 11
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Ab4",
+                "midi": 68
+              },
+              "onset": "3/2",
+              "duration": "1/4",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 9
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F4",
+                "midi": 65
+              },
+              "onset": "7/4",
+              "duration": "1/8",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 10
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Eb4",
+                "midi": 63
+              },
+              "onset": "15/8",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "melodic": "upper-chromatic-neighbor",
+                "metric": "offbeat",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 8
+              }
+            },
+            {
+              "id": "n-mel-7",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C#4",
+                "midi": 61
+              },
+              "onset": "31/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "ninth",
+                "melodic": "lower-chromatic-neighbor",
+                "metric": "subdivision",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 6
+              }
+            },
+            {
+              "id": "n-mel-8",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D4",
+                "midi": 62
+              },
+              "onset": "2",
+              "duration": "1/2",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 7
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Fm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "F",
+              "tones": [
+                "F",
+                "Ab",
+                "C",
+                "Eb"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "Bb7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "Bb",
+              "tones": [
+                "Bb",
+                "D",
+                "F",
+                "Ab"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Ebmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "Eb",
+              "tones": [
+                "Eb",
+                "G",
+                "Bb",
+                "D"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 8,
+        "beats": 10
+      },
+      "y": {
+        "ir": {
+          "version": 1,
+          "id": "p07-y",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Ab4",
+                "midi": 68
+              },
+              "onset": "1/2",
+              "duration": "1/8",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 13
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C5",
+                "midi": 72
+              },
+              "onset": "5/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 13
+              }
+            },
+            {
+              "id": "r-mel-1",
+              "kind": "rest",
+              "voice": "melody",
+              "onset": "3/4",
+              "duration": "1/4"
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb4",
+                "midi": 70
+              },
+              "onset": "1",
+              "duration": "1/2",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "downbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 11
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Ab4",
+                "midi": 68
+              },
+              "onset": "3/2",
+              "duration": "1/4",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 9
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb4",
+                "midi": 70
+              },
+              "onset": "7/4",
+              "duration": "1/8",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "lower-diatonic-neighbor",
+                "metric": "beat",
+                "structural": "approach-note"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 11
+              }
+            },
+            {
+              "id": "r-mel-2",
+              "kind": "rest",
+              "voice": "melody",
+              "onset": "15/8",
+              "duration": "1/8"
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C5",
+                "midi": 72
+              },
+              "onset": "2",
+              "duration": "1",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "thirteenth",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 13
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Fm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "F",
+              "tones": [
+                "F",
+                "Ab",
+                "C",
+                "Eb"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "Bb7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "Bb",
+              "tones": [
+                "Bb",
+                "D",
+                "F",
+                "Ab"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Ebmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "Eb",
+              "tones": [
+                "Eb",
+                "G",
+                "Bb",
+                "D"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 6,
+        "beats": 12
+      }
+    },
+    {
+      "id": "p08",
+      "key": "Eb",
+      "mode": "major",
+      "x": {
+        "ir": {
+          "version": 1,
+          "id": "p08-x",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C4",
+                "midi": 60
+              },
+              "onset": "1/2",
+              "duration": "1/4",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 5
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Eb4",
+                "midi": 63
+              },
+              "onset": "3/4",
+              "duration": "1/2",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 4
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Ab3",
+                "midi": 56
+              },
+              "onset": "5/4",
+              "duration": "1/8",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 2,
+                "fret": 6
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb3",
+                "midi": 58
+              },
+              "onset": "11/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 2,
+                "fret": 8
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F4",
+                "midi": 65
+              },
+              "onset": "3/2",
+              "duration": "1/2",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "lower-diatonic-neighbor",
+                "metric": "strong",
+                "structural": "approach-note"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 10
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G4",
+                "midi": 67
+              },
+              "onset": "2",
+              "duration": "3/4",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 12
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Fm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "F",
+              "tones": [
+                "F",
+                "Ab",
+                "C",
+                "Eb"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "Bb7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "Bb",
+              "tones": [
+                "Bb",
+                "D",
+                "F",
+                "Ab"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Ebmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "Eb",
+              "tones": [
+                "Eb",
+                "G",
+                "Bb",
+                "D"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 6,
+        "beats": 11
+      },
+      "y": {
+        "ir": {
+          "version": 1,
+          "id": "p08-y",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb4",
+                "midi": 70
+              },
+              "onset": "3/2",
+              "duration": "3/16",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 6
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb4",
+                "midi": 70
+              },
+              "onset": "27/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 6
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb4",
+                "midi": 70
+              },
+              "onset": "7/4",
+              "duration": "1/12",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 6
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D4",
+                "midi": 62
+              },
+              "onset": "11/6",
+              "duration": "1/12",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "lower-diatonic-neighbor",
+                "metric": "subdivision",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 7
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "E4",
+                "midi": 64
+              },
+              "onset": "23/12",
+              "duration": "1/12",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "eleventh",
+                "melodic": "upper-chromatic-neighbor",
+                "metric": "subdivision",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Eb4",
+                "midi": 63
+              },
+              "onset": "2",
+              "duration": "1",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 4
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Fm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "F",
+              "tones": [
+                "F",
+                "Ab",
+                "C",
+                "Eb"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "Bb7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "Bb",
+              "tones": [
+                "Bb",
+                "D",
+                "F",
+                "Ab"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Ebmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "Eb",
+              "tones": [
+                "Eb",
+                "G",
+                "Bb",
+                "D"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 6,
+        "beats": 12
+      }
+    },
+    {
+      "id": "p09",
+      "key": "Eb",
+      "mode": "major",
+      "x": {
+        "ir": {
+          "version": 1,
+          "id": "p09-x",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Ab4",
+                "midi": 68
+              },
+              "onset": "3/2",
+              "duration": "1/8",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 9
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb4",
+                "midi": 70
+              },
+              "onset": "13/8",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 11
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D5",
+                "midi": 74
+              },
+              "onset": "27/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 10
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "E5",
+                "midi": 76
+              },
+              "onset": "7/4",
+              "duration": "1/8",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "eleventh",
+                "melodic": "lower-chromatic-neighbor",
+                "metric": "beat",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 12
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G5",
+                "midi": 79
+              },
+              "onset": "15/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "thirteenth",
+                "melodic": "upper-diatonic-neighbor",
+                "metric": "offbeat",
+                "structural": "enclosure-member"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 15
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F5",
+                "midi": 77
+              },
+              "onset": "2",
+              "duration": "1",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "ninth",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 13
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Fm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "F",
+              "tones": [
+                "F",
+                "Ab",
+                "C",
+                "Eb"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "Bb7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "Bb",
+              "tones": [
+                "Bb",
+                "D",
+                "F",
+                "Ab"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Ebmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "Eb",
+              "tones": [
+                "Eb",
+                "G",
+                "Bb",
+                "D"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 6,
+        "beats": 12
+      },
+      "y": {
+        "ir": {
+          "version": 1,
+          "id": "p09-y",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Ab4",
+                "midi": 68
+              },
+              "onset": "1/2",
+              "duration": "1/4",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 13
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C5",
+                "midi": 72
+              },
+              "onset": "3/4",
+              "duration": "1",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 13
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb4",
+                "midi": 70
+              },
+              "onset": "7/4",
+              "duration": "1/16",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 11
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Ab4",
+                "midi": 68
+              },
+              "onset": "29/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 9
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F4",
+                "midi": 65
+              },
+              "onset": "15/8",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 10
+              }
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Ab4",
+                "midi": 68
+              },
+              "onset": "31/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "lower-diatonic-neighbor",
+                "metric": "subdivision",
+                "structural": "approach-note"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 9
+              }
+            },
+            {
+              "id": "n-mel-7",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb4",
+                "midi": 70
+              },
+              "onset": "2",
+              "duration": "3/4",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 11
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Fm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "F",
+              "tones": [
+                "F",
+                "Ab",
+                "C",
+                "Eb"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "Bb7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "Bb",
+              "tones": [
+                "Bb",
+                "D",
+                "F",
+                "Ab"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Ebmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "Eb",
+              "tones": [
+                "Eb",
+                "G",
+                "Bb",
+                "D"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 7,
+        "beats": 11
+      }
+    },
+    {
+      "id": "p10",
+      "key": "F",
+      "mode": "major",
+      "x": {
+        "ir": {
+          "version": 1,
+          "id": "p10-x",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb4",
+                "midi": 70
+              },
+              "onset": "1",
+              "duration": "1/8",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "downbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 11
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C5",
+                "midi": 72
+              },
+              "onset": "9/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 13
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "E5",
+                "midi": 76
+              },
+              "onset": "5/4",
+              "duration": "1/2",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 12
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C#5",
+                "midi": 73
+              },
+              "onset": "7/4",
+              "duration": "1/4",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "melodic": "lower-chromatic-neighbor",
+                "metric": "beat",
+                "structural": "approach-note"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 14
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D5",
+                "midi": 74
+              },
+              "onset": "2",
+              "duration": "1/2",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "thirteenth",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 15
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Gm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "G",
+              "tones": [
+                "G",
+                "Bb",
+                "D",
+                "F"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "C7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "C",
+              "tones": [
+                "C",
+                "E",
+                "G",
+                "Bb"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Fmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "F",
+              "tones": [
+                "F",
+                "A",
+                "C",
+                "E"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 5,
+        "beats": 10
+      },
+      "y": {
+        "ir": {
+          "version": 1,
+          "id": "p10-y",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb4",
+                "midi": 70
+              },
+              "onset": "1/2",
+              "duration": "1/8",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 15
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D5",
+                "midi": 74
+              },
+              "onset": "5/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 15
+              }
+            },
+            {
+              "id": "r-mel-1",
+              "kind": "rest",
+              "voice": "melody",
+              "onset": "3/4",
+              "duration": "1/4"
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C5",
+                "midi": 72
+              },
+              "onset": "1",
+              "duration": "1/2",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "downbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 13
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb4",
+                "midi": 70
+              },
+              "onset": "3/2",
+              "duration": "1/4",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 11
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C5",
+                "midi": 72
+              },
+              "onset": "7/4",
+              "duration": "1/8",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "lower-diatonic-neighbor",
+                "metric": "beat",
+                "structural": "approach-note"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 13
+              }
+            },
+            {
+              "id": "r-mel-2",
+              "kind": "rest",
+              "voice": "melody",
+              "onset": "15/8",
+              "duration": "1/8"
+            },
+            {
+              "id": "n-mel-6",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "D5",
+                "midi": 74
+              },
+              "onset": "2",
+              "duration": "1",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "thirteenth",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 15
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Gm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "G",
+              "tones": [
+                "G",
+                "Bb",
+                "D",
+                "F"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "C7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "C",
+              "tones": [
+                "C",
+                "E",
+                "G",
+                "Bb"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Fmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "F",
+              "tones": [
+                "F",
+                "A",
+                "C",
+                "E"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 6,
+        "beats": 12
+      }
+    },
+    {
+      "id": "p11",
+      "key": "F",
+      "mode": "major",
+      "x": {
+        "ir": {
+          "version": 1,
+          "id": "p11-x",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C5",
+                "midi": 72
+              },
+              "onset": "3/2",
+              "duration": "1/8",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 13
+              }
+            },
+            {
+              "id": "r-mel-1",
+              "kind": "rest",
+              "voice": "melody",
+              "onset": "13/8",
+              "duration": "1/8"
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "E5",
+                "midi": 76
+              },
+              "onset": "7/4",
+              "duration": "1/12",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "beat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 12
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G5",
+                "midi": 79
+              },
+              "onset": "11/6",
+              "duration": "1/12",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 15
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F5",
+                "midi": 77
+              },
+              "onset": "23/12",
+              "duration": "1/12",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "melodic": "upper-diatonic-neighbor",
+                "metric": "subdivision",
+                "structural": "approach-note"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 13
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "E5",
+                "midi": 76
+              },
+              "onset": "2",
+              "duration": "1",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 12
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Gm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "G",
+              "tones": [
+                "G",
+                "Bb",
+                "D",
+                "F"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "C7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "C",
+              "tones": [
+                "C",
+                "E",
+                "G",
+                "Bb"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Fmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "F",
+              "tones": [
+                "F",
+                "A",
+                "C",
+                "E"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 5,
+        "beats": 12
+      },
+      "y": {
+        "ir": {
+          "version": 1,
+          "id": "p11-y",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb3",
+                "midi": 58
+              },
+              "onset": "3/2",
+              "duration": "1/8",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 3
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "E4",
+                "midi": 64
+              },
+              "onset": "13/8",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arpeggio-tone",
+                "metric": "offbeat",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb4",
+                "midi": 70
+              },
+              "onset": "27/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 6
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "F4",
+                "midi": 65
+              },
+              "onset": "7/4",
+              "duration": "1/4",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "melodic": "upper-chromatic-neighbor",
+                "metric": "beat",
+                "structural": "approach-note"
+              },
+              "instrument": {
+                "string": 4,
+                "fret": 6
+              }
+            },
+            {
+              "id": "n-mel-5",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "E4",
+                "midi": 64
+              },
+              "onset": "2",
+              "duration": "1/2",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 0
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Gm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "G",
+              "tones": [
+                "G",
+                "Bb",
+                "D",
+                "F"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "C7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "C",
+              "tones": [
+                "C",
+                "E",
+                "G",
+                "Bb"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Fmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "F",
+              "tones": [
+                "F",
+                "A",
+                "C",
+                "E"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 5,
+        "beats": 10
+      }
+    },
+    {
+      "id": "p12",
+      "key": "F",
+      "mode": "major",
+      "x": {
+        "ir": {
+          "version": 1,
+          "id": "p12-x",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "r-mel-1",
+              "kind": "rest",
+              "voice": "melody",
+              "onset": "1",
+              "duration": "1/2"
+            },
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "G3",
+                "midi": 55
+              },
+              "onset": "3/2",
+              "duration": "1/8",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "run-start",
+                "metric": "strong",
+                "structural": "run-note"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 0
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "A3",
+                "midi": 57
+              },
+              "onset": "13/8",
+              "duration": "1/8",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "thirteenth",
+                "melodic": "passing-tone",
+                "metric": "offbeat",
+                "structural": "run-note"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 2
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb3",
+                "midi": 58
+              },
+              "onset": "7/4",
+              "duration": "1/4",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "passing-tone",
+                "metric": "beat",
+                "structural": "run-note"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 3
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C4",
+                "midi": 60
+              },
+              "onset": "2",
+              "duration": "1",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "fifth",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 3,
+                "fret": 5
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Gm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "G",
+              "tones": [
+                "G",
+                "Bb",
+                "D",
+                "F"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "C7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "C",
+              "tones": [
+                "C",
+                "E",
+                "G",
+                "Bb"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Fmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "F",
+              "tones": [
+                "F",
+                "A",
+                "C",
+                "E"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 4,
+        "beats": 12
+      },
+      "y": {
+        "ir": {
+          "version": 1,
+          "id": "p12-y",
+          "title": "Example",
+          "tempo": {
+            "bpm": "100",
+            "beat": "1/4"
+          },
+          "meter": {
+            "groups": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "unit": "1/4"
+          },
+          "voices": [
+            {
+              "id": "melody",
+              "name": "Melody",
+              "role": "melody",
+              "instrument": {
+                "name": "guitar",
+                "tuning": [
+                  "E2",
+                  "A2",
+                  "D3",
+                  "G3",
+                  "B3",
+                  "E4"
+                ]
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "n-mel-1",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb4",
+                "midi": 70
+              },
+              "onset": "3/2",
+              "duration": "3/16",
+              "velocity": 0.8,
+              "accent": 2,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "arpeggio-tone",
+                "metric": "strong",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 6
+              }
+            },
+            {
+              "id": "n-mel-2",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "C5",
+                "midi": 72
+              },
+              "onset": "27/16",
+              "duration": "1/16",
+              "velocity": 0.6,
+              "accent": 0,
+              "roles": {
+                "harmonic": "root",
+                "melodic": "arpeggio-tone",
+                "metric": "subdivision",
+                "structural": "outline"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 8
+              }
+            },
+            {
+              "id": "n-mel-3",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "Bb4",
+                "midi": 70
+              },
+              "onset": "7/4",
+              "duration": "1/4",
+              "velocity": 0.7,
+              "accent": 1,
+              "roles": {
+                "harmonic": "seventh",
+                "melodic": "upper-diatonic-neighbor",
+                "metric": "beat",
+                "structural": "approach-note"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 6
+              }
+            },
+            {
+              "id": "n-mel-4",
+              "kind": "note",
+              "voice": "melody",
+              "pitch": {
+                "name": "A4",
+                "midi": 69
+              },
+              "onset": "2",
+              "duration": "1/8",
+              "velocity": 0.9,
+              "accent": 3,
+              "roles": {
+                "harmonic": "third",
+                "melodic": "arrival",
+                "metric": "downbeat",
+                "structural": "target"
+              },
+              "instrument": {
+                "string": 5,
+                "fret": 5
+              }
+            }
+          ],
+          "chords": [
+            {
+              "id": "c-0",
+              "onset": "0",
+              "duration": "1",
+              "symbol": "Gm7",
+              "roman": "iim7",
+              "quality": "minor7",
+              "root": "G",
+              "tones": [
+                "G",
+                "Bb",
+                "D",
+                "F"
+              ]
+            },
+            {
+              "id": "c-1",
+              "onset": "1",
+              "duration": "1",
+              "symbol": "C7",
+              "roman": "V7",
+              "quality": "dominant7",
+              "root": "C",
+              "tones": [
+                "C",
+                "E",
+                "G",
+                "Bb"
+              ]
+            },
+            {
+              "id": "c-2",
+              "onset": "2",
+              "duration": "1",
+              "symbol": "Fmaj7",
+              "roman": "Imaj7",
+              "quality": "major7",
+              "root": "F",
+              "tones": [
+                "F",
+                "A",
+                "C",
+                "E"
+              ]
+            }
+          ],
+          "relations": [],
+          "constraints": [],
+          "transformations": []
+        },
+        "notes": 4,
+        "beats": 8.5
+      }
+    }
+  ]
+}

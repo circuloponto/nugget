@@ -3,31 +3,32 @@
 import { useCallback, useEffect, useState } from "react";
 import PhraseConstructor from "../phrase/PhraseConstructor";
 import MusicalLab from "../lab/MusicalLab";
-import CorpusExplorer from "../corpus/CorpusExplorer";
-import ComparisonView from "../corpus/compare/ComparisonView";
-import Lab from "../Lab";
+import { AbListening, ComparisonView, CorpusExplorer, Lab } from "research-views";
 import { Settings } from "lucide-react";
 import Appearance from "./Appearance";
 import { IC } from "./icons";
 import { ShellContext } from "./shellContext";
 
-export type ViewId = "workbench" | "lab" | "corpus" | "compare" | "evaluator";
+// The research views. A normal production build resolves "research-views" to a stub (see next.config.mjs), so they are absent.
+const RESEARCH_TOOLS = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_NUGGET_RESEARCH === "1";
 
-const VIEWS: { id: ViewId; label: string; title: string; path: string }[] = [
+export type ViewId = "workbench" | "lab" | "corpus" | "compare" | "ab" | "evaluator";
+
+const ALL_VIEWS: { id: ViewId; label: string; title: string; path: string; research?: true }[] = [
   { id: "workbench", label: "Workbench", title: "Melodic Workbench", path: "/" },
   { id: "lab", label: "Lab", title: "Musical Lab", path: "/lab" },
-  { id: "corpus", label: "Corpus", title: "Corpus Analysis", path: "/corpus" },
-  { id: "compare", label: "Generator vs corpus", title: "Generator against the corpus", path: "/corpus/compare" },
-  { id: "evaluator", label: "Evaluator", title: "Engine evaluator", path: "/evaluator" },
+  { id: "corpus", label: "Corpus", title: "Corpus Analysis", path: "/corpus", research: true },
+  { id: "compare", label: "Generator vs corpus", title: "Generator against the corpus", path: "/corpus/compare", research: true },
+  { id: "ab", label: "Listening A/B", title: "Blind A/B listening", path: "/ab", research: true },
+  { id: "evaluator", label: "Evaluator", title: "Engine evaluator", path: "/evaluator", research: true },
 ];
+const VIEWS = ALL_VIEWS.filter((v) => RESEARCH_TOOLS || !v.research);
 
 export const viewFromPath = (pathname: string): ViewId => {
   const p = pathname.replace(/\/+$/, "") || "/";
-  if (p === "/corpus/compare") return "compare";
-  if (p === "/corpus") return "corpus";
-  if (p === "/lab") return "lab";
-  if (p === "/evaluator") return "evaluator";
-  return "workbench"; // "/" and "/phrase"
+  const hit = ALL_VIEWS.find((v) => v.path === p);
+  if (hit && VIEWS.includes(hit)) return hit.id;
+  return "workbench"; // "/", "/phrase", and any research view when the tools are off
 };
 
 /** A pixel nugget with a hard red shadow, drawn from a grid of squares like the rest of the look. */
@@ -109,15 +110,18 @@ export default function AppShell({ initial }: { initial: ViewId }) {
           <section className="view" hidden={view !== "lab"} aria-label="Musical Lab">
             {show("lab") && <MusicalLab active={view === "lab"} />}
           </section>
-          <section className="view" hidden={view !== "corpus"} aria-label="Corpus Analysis">
-            {show("corpus") && <CorpusExplorer active={view === "corpus"} />}
-          </section>
-          <section className="view" hidden={view !== "compare"} aria-label="Generator against the corpus">
-            {show("compare") && <ComparisonView active={view === "compare"} />}
-          </section>
-          <section className="view" hidden={view !== "evaluator"} aria-label="Engine evaluator">
-            {show("evaluator") && <Lab active={view === "evaluator"} />}
-          </section>
+          {RESEARCH_TOOLS && <section className="view" hidden={view !== "corpus"} aria-label="Corpus Analysis">
+            {show("corpus") && CorpusExplorer && <CorpusExplorer active={view === "corpus"} />}
+          </section>}
+          {RESEARCH_TOOLS && <section className="view" hidden={view !== "compare"} aria-label="Generator against the corpus">
+            {show("compare") && ComparisonView && <ComparisonView active={view === "compare"} />}
+          </section>}
+          {RESEARCH_TOOLS && <section className="view" hidden={view !== "ab"} aria-label="Blind A/B listening">
+            {show("ab") && AbListening && <AbListening active={view === "ab"} />}
+          </section>}
+          {RESEARCH_TOOLS && <section className="view" hidden={view !== "evaluator"} aria-label="Engine evaluator">
+            {show("evaluator") && Lab && <Lab active={view === "evaluator"} />}
+          </section>}
         </div>
       </div>
       <Appearance open={settingsOpen} onClose={closeSettings} />

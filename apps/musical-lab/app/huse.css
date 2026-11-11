@@ -414,3 +414,29 @@ dt { color: var(--muted); }
 /* ── Corpus: the loaded piece sits in its own wrapper so it can be marked stale while the next one loads ───── */
 .co2-loaded { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; min-height: 0; min-width: 0; }
 .co2-loaded.is-stale > :not(.banner) { opacity: 0.5; pointer-events: none; }
+
+/* ── comparison: stability and the verdict in each subset, on a line of their own under the row ───────────── */
+.cmp-meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding: 0 0 2px 0; }
+.cmp-meta small { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.cmp-stab { border: 2px solid var(--ink); padding: 0 6px; color: var(--ink) !important; background: var(--card); }
+.cmp-stab.stable { background: var(--ink); color: var(--bg) !important; }
+.cmp-stab.repertoire { background: var(--accent); }
+.cmp-stab.unclear { border-style: dashed; color: var(--muted) !important; }
+
+/* ── blind A/B listening (research tool) ──────────────────────────────────────────────────────────────────── */
+.ab2 { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; overflow: auto; padding: 4px 2px 12px; }
+.ab2-card { display: flex; flex-direction: column; gap: 14px; max-width: 760px; width: 100%; margin: 0 auto; }
+.ab2-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.ab2-head h2 { margin: 0; }
+.ab2-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.ab2-side { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 12px; background: var(--bg); border: 2px solid var(--ink); }
+.ab2-label { font-family: var(--display); font-size: 28px; }
+.ab2-q { border: 2px solid var(--ink); padding: 8px 14px 12px; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+.ab2-q legend { padding: 0 6px; font-weight: 700; }
+.ab2-q label { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 2px solid transparent; cursor: pointer; }
+.ab2-q label.on { border-color: var(--ink); background: var(--accent); }
+.ab2-nav { display: flex; gap: 8px; align-items: center; }
+.ab2-nav .grow { flex: 1; }
+.ab2-table { width: 100%; border-collapse: collapse; }
+.ab2-table th, .ab2-table td { border: 2px solid var(--ink); padding: 6px 10px; text-align: left; }
+@media (max-width: 640px) { .ab2-pair { grid-template-columns: 1fr; } }

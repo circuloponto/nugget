@@ -3,7 +3,7 @@
 import { Info, ArrowUp, ArrowDown } from "lucide-react";
 import { IC, IC_SM } from "../../ui/icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { corpus } from "@musical-lab/engine";
+import { corpus } from "@musical-lab/engine";
 import Modal from "../../ui/Modal";
 import Tabs from "../../ui/Tabs";
 import { Topbar } from "../../ui/shellContext";
@@ -22,9 +22,18 @@ const GROUPS: { id: corpus.MetricGroup | "all"; name: string }[] = [
   { id: "contour", name: "contour" },
   { id: "ending", name: "endings" },
   { id: "diversity", name: "diversity" },
+  { id: "continuity", name: "continuity" },
+  { id: "development", name: "development" },
 ];
+const SUBSET_NAMES: Record<corpus.SubsetId, string> = { all: "all", fourFour: "4/4", matched: "length-matched", matchedFourFour: "matched 4/4", development: "development", heldOut: "held-out" };
+const STABILITY_NAMES: Record<corpus.Stability, { label: string; hint: string }> = {
+  stable: { label: "stable", hint: "outside the corpus's range in the same direction in every control subset that was large enough" },
+  "stable-within": { label: "within everywhere", hint: "inside the corpus's range in every control subset that was large enough" },
+  repertoire: { label: "depends on the repertoire", hint: "the subsets disagree, so the difference may only reflect which music is compared" },
+  unclear: { label: "too little data", hint: "fewer than two control subsets were large enough to judge" },
+};
 
-const fmt = (v: number, unit: Row["unit"]): string => (unit === "share" ? `${Math.round(v * 1000) / 10}%` : unit === "score" ? v.toFixed(2) : String(Math.round(v * 100) / 100));
+const fmt = (v: number | null, unit: Row["unit"]): string => (v === null ? "n/a" : unit === "share" ? `${Math.round(v * 1000) / 10}%` : unit === "score" ? v.toFixed(2) : String(Math.round(v * 100) / 100));
 
 export default function ComparisonView({ active = true }: { active?: boolean }) {
   const [state, setState] = useState<{ comparison?: Comparison | null; reason?: string; error?: string } | null>(null);
@@ -37,13 +46,20 @@ export default function ComparisonView({ active = true }: { active?: boolean }) 
   useEffect(() => {
     fetch("/api/corpus?comparison=1")
       .then((r) => r.json())
-      .then((d: { available: boolean; comparison?: Comparison | null; reason?: string }) => setState(d.available ? { comparison: d.comparison ?? null, reason: d.reason } : { reason: d.reason }))
+      .then((d: { available: boolean; comparison?: Comparison | null; reason?: string }) => {
+        if (!d.available) return setState({ reason: d.reason });
+        // a file written by an earlier version has other fields: say so instead of drawing a broken page
+        if (d.comparison && (d.comparison as { version?: number }).version !== 2) return setState({ reason: "This comparison was written by an earlier version of the tool. Run: npm run compare -- data/corpus/incoming/nugget_folk_starter.zip (the earlier file is kept as comparison.baseline-3h4.json if you made one)." });
+        setState({ comparison: d.comparison ?? null, reason: d.reason });
+      })
       .catch((e) => setState({ error: String(e) }));
   }, []);
 
   const c = state?.comparison ?? null;
-  const rows = useMemo(() => (c ? c.rows.filter((r) => (group === "all" || r.group === group) && (!onlyOutside || r.verdict !== "within")) : []), [c, group, onlyOutside]);
-  const outside = c ? c.rows.filter((r) => r.verdict !== "within").length : 0;
+  const rows = useMemo(() => (c ? c.rows.filter((r) => (group === "all" || r.group === group) && (!onlyOutside || (r.verdict !== null && r.verdict !== "within"))) : []), [c, group, onlyOutside]);
+  const outside = c ? c.rows.filter((r) => r.verdict !== null && r.verdict !== "within").length : 0;
+  const stable = c ? c.rows.filter((r) => r.stability === "stable").length : 0;
+  const repertoire = c ? c.rows.filter((r) => r.stability === "repertoire").length : 0;
 
   return (
     <div className="cmp2">
@@ -76,11 +92,13 @@ export default function ComparisonView({ active = true }: { active?: boolean }) 
               <Fig k="generated phrases" v={`${c.sample.phrases} from ${c.sample.runs} runs`} hint={`${c.sample.keys.length} keys × seeds ${c.sample.seeds.join(", ")}; every phrase in ${c.sample.meter}`} />
               <Fig k="corpus phrases" v={`${c.corpus.phrases} from ${c.corpus.pieces} tunes`} hint="the corpus's hypothesised phrases at the primary reading" />
               <Fig k="corpus 4/4 only" v={`${c.corpus.fourFourPhrases} from ${c.corpus.fourFourPieces} tunes`} hint="the generator writes only 4/4" />
+              <Fig k="matched to generator length" v={`${c.subsets.matched.phrases} from ${c.subsets.matched.pieces} tunes`} hint={`corpus phrases of ${c.matchRange[0]}–${c.matchRange[1]} beats, the generator's own range; ${c.subsets.matchedFourFour.phrases} of them from ${c.subsets.matchedFourFour.pieces} tunes in 4/4`} />
               <Fig k="development / held-out" v={`${c.corpus.split.development.length} / ${c.corpus.split.heldOut.length} tunes`} hint="fixed split by category and hash, for later work" />
-              <Fig k="outside the corpus's range" v={`${outside} of ${c.rows.length} metrics`} hint="generator value outside the 10th–90th percentile of individual corpus tunes" />
+              <Fig k="outside the corpus's range" v={`${outside} of ${c.rows.length} metrics`} hint="generator value outside the 10th–90th percentile of individual corpus tunes (whole corpus)" />
+              <Fig k="stable / repertoire-dependent" v={`${stable} / ${repertoire}`} hint="of those metrics: the direction holds in every control subset, or the subsets disagree" />
             </div>
             <p className="banner cmp2-strip" data-testid="cmp-strip">
-              <span>A difference is where to look, not a verdict on quality. The corpus is 23 folk dance tunes; the generator writes jazz-style lines over a ii–V–I.</span>
+              <span>A difference is where to look, not a verdict on quality. Corpus: {c.corpus.name}, {c.corpus.pieces} tunes (by meter: {Object.entries(c.corpus.meters).map(([m, n]) => `${n} in ${m}`).join(", ")}); the generator writes {c.sample.meter} only.</span>
               <button className="btn small" onClick={() => setModal("caveats")}>All caveats</button>
             </p>
           </section>
@@ -181,27 +199,39 @@ function Fig({ k, v, hint }: { k: string; v: string; hint?: string }) {
 }
 
 function RangeRow({ row }: { row: Row }) {
-  const top = Math.max(row.unit === "share" ? 0.05 : 0.01, row.generator, row.corpus, row.corpusFourFour, row.corpusSpread[1], row.generatorSpread[1]) * 1.12;
+  const cs = row.corpusSpread;
+  const gs = row.generatorSpread;
+  const top = Math.max(row.unit === "share" ? 0.05 : 0.01, row.generator ?? 0, row.corpus ?? 0, row.corpusFourFour ?? 0, cs?.[1] ?? 0, gs?.[1] ?? 0) * 1.12;
   const p = (v: number) => `${Math.max(0, Math.min(100, (v / top) * 100))}%`;
+  const st = STABILITY_NAMES[row.stability];
+  const verdictLabel = (v: corpus.Verdict | null) => (v === null ? "n/a" : v);
   return (
-    <div className={`cmp-row ${row.verdict}`} data-metric={row.id} data-verdict={row.verdict} title={row.description}>
+    <div className={`cmp-row ${row.verdict ?? "unknown"}`} data-metric={row.id} data-verdict={row.verdict ?? "none"} data-stability={row.stability} title={row.description}>
       <div className="cmp-label">
         <b>{row.label}</b>
         <span>{row.group}</span>
       </div>
       <div className="cmp-track" role="img" aria-label={`${row.label}: generator ${fmt(row.generator, row.unit)}, corpus ${fmt(row.corpus, row.unit)}`}>
-        <i className="cmp-band" style={{ left: p(row.corpusSpread[0]), width: `calc(${p(row.corpusSpread[1])} - ${p(row.corpusSpread[0])})` }} />
-        <i className="cmp-gspread" style={{ left: p(row.generatorSpread[0]), width: `calc(${p(row.generatorSpread[1])} - ${p(row.generatorSpread[0])})` }} />
-        <i className="cmp-tick corpus" style={{ left: p(row.corpus) }} />
-        <i className="cmp-tick four" style={{ left: p(row.corpusFourFour) }} />
-        <i className="cmp-dot" style={{ left: p(row.generator) }} />
+        {cs && <i className="cmp-band" style={{ left: p(cs[0]), width: `calc(${p(cs[1])} - ${p(cs[0])})` }} />}
+        {gs && <i className="cmp-gspread" style={{ left: p(gs[0]), width: `calc(${p(gs[1])} - ${p(gs[0])})` }} />}
+        {row.corpus !== null && <i className="cmp-tick corpus" style={{ left: p(row.corpus) }} />}
+        {row.corpusFourFour !== null && <i className="cmp-tick four" style={{ left: p(row.corpusFourFour) }} />}
+        {row.generator !== null && <i className="cmp-dot" style={{ left: p(row.generator) }} />}
       </div>
       <div className="cmp-nums">
         <span style={{ borderBottom: `3px solid ${COLORS.generator}` }}>{fmt(row.generator, row.unit)}</span>
         <span style={{ borderBottom: `3px solid ${COLORS.corpus}` }}>{fmt(row.corpus, row.unit)}</span>
         <span style={{ borderBottom: `3px solid ${COLORS.fourFour}` }}>{fmt(row.corpusFourFour, row.unit)}</span>
       </div>
-      <div className="cmp-verdict">{row.verdict === "within" ? "within" : row.verdict === "above" ? <><ArrowUp {...IC_SM} /> above</> : <><ArrowDown {...IC_SM} /> below</>}</div>
+      <div className="cmp-verdict">
+        {row.verdict === null ? "n/a" : row.verdict === "within" ? "within" : row.verdict === "above" ? <><ArrowUp {...IC_SM} /> above</> : <><ArrowDown {...IC_SM} /> below</>}
+      </div>
+      <div className="cmp-meta">
+        <small className={`cmp-stab ${row.stability}`} title={st.hint} data-testid="cmp-stability">{st.label}</small>
+        <small className="cmp-subsets" data-testid="cmp-subsets" title="verdict in each way of cutting the corpus; n/a = too few tunes to judge">
+          {corpus.SUBSETS.map((id) => `${SUBSET_NAMES[id]}: ${verdictLabel(row.verdicts[id])}`).join(" · ")}
+        </small>
+      </div>
     </div>
   );
 }

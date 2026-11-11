@@ -10,14 +10,27 @@ import { DEFAULT_PHRASE_REQUEST, generationSpaceFromRequest, type PhraseRequest 
 import { explorePhrases, type ExploredPhrase } from "../grammar/explore";
 import { phraseToIR } from "../grammar/document";
 import { melodyFromIR, type MelodyLine } from "./analysis/melody";
+import type { MusicIR } from "../ir/types";
 
 export const SAMPLE_KEYS: readonly string[] = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+
+export interface GeneratedPhrase {
+  readonly line: MelodyLine;
+  readonly traits: ExploredPhrase["traits"];
+  readonly chips: readonly string[];
+  /** The playable document the line was read from. */
+  readonly ir?: MusicIR;
+  /** Generator B only: what was drawn from the corpus profile for this phrase, so the draw can be checked. */
+  readonly sampled?: { readonly finalBeats: number; readonly activityShape: string; readonly density: string; readonly relation: string; readonly parent: number | null };
+}
 
 export interface GeneratorRun {
   readonly key: string;
   readonly mode: "major" | "minor";
   readonly seed: number;
-  readonly phrases: readonly { readonly line: MelodyLine; readonly traits: ExploredPhrase["traits"]; readonly chips: readonly string[] }[];
+  /** Which generator made the run. Absent means A, the original generator. */
+  readonly generator?: "A" | "B";
+  readonly phrases: readonly GeneratedPhrase[];
   /** Set when the engine returned fewer than asked, or failed; the run is kept so nothing is hidden. */
   readonly note?: string;
 }
@@ -50,7 +63,7 @@ export function sampleGenerator(options: GeneratorSampleOptions = {}): Generator
         const phrases = result.candidates.map((c) => {
           const ir = phraseToIR(c, c.spec, { bpm: req.bpm, bass: false });
           const line = melodyFromIR(ir, { key: { tonic: key, mode: mode === "major" ? "major" : "minor" }, origin: "generated" });
-          return { line: { ...line, id: `${key}-${mode}-s${seed}-${c.id}` }, traits: c.traits, chips: c.chips };
+          return { line: { ...line, id: `${key}-${mode}-s${seed}-${c.id}` }, traits: c.traits, chips: c.chips, ir };
         });
         runs.push({ key, mode, seed, phrases, ...(result.stats.note ? { note: result.stats.note } : {}) });
       }

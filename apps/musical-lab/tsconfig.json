@@ -17,6 +17,8 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
+    "baseUrl": ".",
+    "paths": { "research-views": ["./app/ui/researchViews.tsx"] },
     "plugins": [
       {
         "name": "next"
